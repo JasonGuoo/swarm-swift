@@ -16,4 +16,12 @@ public class Config {
     func value(forKey key: String) -> String? {
         return config?[key] as? String
     }
+
+    func setValue(forKey key:String, value: String) {
+        config?[key] = value
+    }
+
+    func isEmpty() -> Bool {
+        return config?.isEmpty ?? true
+    }
 }

@@ -140,16 +140,16 @@ public class OpenAIClient: LLMClient {
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                 let embeddingResponse = try decoder.decode(EmbeddingResponse.self, from: data)
                 
-                // 将EmbeddingResponse转换为LLMResponse
+                // Convert EmbeddingResponse to LLMResponse
                 let llmResponse = LLMResponse(
                     id: embeddingResponse.id,
                     object: embeddingResponse.object,
                     created: embeddingResponse.created,
                     model: embeddingResponse.model,
-                    choices: [], // Embedding不使用choices
+                    choices: [], // Embedding doesn't use choices
                     usage: LLMResponse.Usage(
                         promptTokens: embeddingResponse.usage.promptTokens,
-                        completionTokens: 0, // Embedding不使用completionTokens
+                        completionTokens: 0, // Embedding doesn't use completionTokens
                         totalTokens: embeddingResponse.usage.totalTokens
                     ),
                     systemFingerprint: nil,
@@ -366,7 +366,7 @@ public class OpenAIClient: LLMClient {
     }
 }
 
-// 用于解析Embedding响应的结构
+// Structure for parsing Embedding response
 struct EmbeddingResponse: Codable {
     let id: String
     let object: String
@@ -387,7 +387,7 @@ struct EmbeddingResponse: Codable {
     }
 }
 
-// 用于解析转录和翻译响应的结构
+// Structures for parsing transcription and translation responses
 struct TranscriptionResponse: Codable {
     let text: String
 }
