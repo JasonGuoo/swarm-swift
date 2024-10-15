@@ -227,38 +227,21 @@ public class OpenAIClient: LLMClient {
             return
         }
 
-        #if DEBUG
-        print("Request URL: \(url.absoluteString)")
-        #endif
+        DebugUtils.printDebug("Request URL: \(url.absoluteString)")
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        #if DEBUG
-        print("Request Headers:")
-        urlRequest.allHTTPHeaderFields?.forEach { key, value in
-            if key.lowercased() == "authorization" {
-                let maskedValue = "Bearer " + String(repeating: "*", count: max(0, apiKey.count))
-                print("  \(key): \(maskedValue)")
-            } else {
-                print("  \(key): \(value)")
-            }
-        }
-        #endif
+        DebugUtils.printDebugHeaders(urlRequest.allHTTPHeaderFields ?? [:])
 
         do {
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
             let jsonData = try encoder.encode(request)
             urlRequest.httpBody = jsonData
-            #if DEBUG
-            print("Request Body:")
-            if let jsonString = String(data: jsonData, encoding: .utf8) {
-                print(jsonString)
-            }
-            #endif
+            DebugUtils.printDebugJSON(jsonData)
         } catch {
             completion(.failure(error))
             return
@@ -266,37 +249,23 @@ public class OpenAIClient: LLMClient {
 
         let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
             if let error = error {
-                #if DEBUG
-                print("Network Error: \(error.localizedDescription)")
-                #endif
+                DebugUtils.printDebug("Network Error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
 
-            #if DEBUG
             if let httpResponse = response as? HTTPURLResponse {
-                print("HTTP Status Code: \(httpResponse.statusCode)")
-                print("Response Headers:")
-                httpResponse.allHeaderFields.forEach { key, value in
-                    print("  \(key): \(value)")
-                }
+                DebugUtils.printDebug("HTTP Status Code: \(httpResponse.statusCode)")
+                DebugUtils.printDebugHeaders(httpResponse.allHeaderFields as? [String: String] ?? [:])
             }
-            #endif
 
             guard let data = data else {
-                #if DEBUG
-                print("No data received")
-                #endif
+                DebugUtils.printDebug("No data received")
                 completion(.failure(LLMError.requestFailed))
                 return
             }
 
-            #if DEBUG
-            print("Raw Response Data:")
-            if let rawResponse = String(data: data, encoding: .utf8) {
-                print(rawResponse)
-            }
-            #endif
+            DebugUtils.printDebugJSON(data)
 
             do {
                 let decoder = JSONDecoder()
@@ -304,9 +273,7 @@ public class OpenAIClient: LLMClient {
                 let apiResponse = try decoder.decode(LLMResponse.self, from: data)
                 completion(.success(apiResponse))
             } catch {
-                #if DEBUG
-                print("Decoding Error: \(error.localizedDescription)")
-                #endif
+                DebugUtils.printDebug("Decoding Error: \(error.localizedDescription)")
                 completion(.failure(error))
             }
         }
