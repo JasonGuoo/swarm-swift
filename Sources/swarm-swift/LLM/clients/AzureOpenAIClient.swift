@@ -33,9 +33,12 @@ public class AzureOpenAIClient: LLMClient {
         #endif
 
         do {
+            var modifiedRequest = request
+            applyDefaultValues(&modifiedRequest)
+            
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
-            let jsonData = try encoder.encode(request)
+            let jsonData = try encoder.encode(modifiedRequest)
             urlRequest.httpBody = jsonData
             #if DEBUG
             print("Request Body:")
@@ -120,14 +123,14 @@ public class AzureOpenAIClient: LLMClient {
         }
         #endif
 
-        let completionRequest = [
-            "prompt": request.messages.last?.content ?? "",
-            "max_tokens": request.maxTokens ?? 100,
-            "temperature": request.temperature ?? 0.7
-        ] as [String : Any]
-
         do {
-            let jsonData = try JSONSerialization.data(withJSONObject: completionRequest, options: .prettyPrinted)
+            var modifiedRequest = request
+            applyDefaultValues(&modifiedRequest)
+            
+            let completionRequest = CompletionRequest(from: modifiedRequest)
+            let encoder = JSONEncoder()
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            let jsonData = try encoder.encode(completionRequest)
             urlRequest.httpBody = jsonData
             #if DEBUG
             print("Request Body:")
@@ -255,4 +258,33 @@ public class AzureOpenAIClient: LLMClient {
 
     // Other methods (createImage, createSpeech, createTranscription, createTranslation) 
     // can remain unchanged or be adjusted based on Azure OpenAI's support
+
+    private func applyDefaultValues(_ request: inout LLMRequest) {
+        request.maxTokens = request.maxTokens ?? 4096
+        request.temperature = request.temperature ?? 0.7
+        request.topP = request.topP ?? 1.0
+        request.frequencyPenalty = request.frequencyPenalty ?? 0.0
+        request.presencePenalty = request.presencePenalty ?? 0.0
+        request.stop = request.stop ?? []
+    }
+
+    private struct CompletionRequest: Codable {
+        let prompt: String
+        let maxTokens: Int
+        let temperature: Double
+        let topP: Double
+        let frequencyPenalty: Double
+        let presencePenalty: Double
+        let stop: [String]
+
+        init(from request: LLMRequest) {
+            self.prompt = request.messages.last?.content ?? ""
+            self.maxTokens = request.maxTokens ?? 4096
+            self.temperature = request.temperature ?? 0.7
+            self.topP = request.topP ?? 1.0
+            self.frequencyPenalty = request.frequencyPenalty ?? 0.0
+            self.presencePenalty = request.presencePenalty ?? 0.0
+            self.stop = request.stop ?? []
+        }
+    }
 }
