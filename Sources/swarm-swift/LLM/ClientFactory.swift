@@ -1,6 +1,23 @@
 import Foundation
 
 public class ClientFactory {
+
+        /// Creates a default LLM client based on available configuration.
+    /// It checks environment variables and .env file, defaulting to OpenAI if no specific configuration is found.
+    /// - Returns: An LLMClient instance if successful, nil otherwise.
+    public static func getDefaultClient() -> LLMClient? {
+        if let envConfig = generateConfigFromEnvironment() {
+            let apiType = envConfig.value(forKey: "API_TYPE") ?? "OpenAI"
+            return getLLMClient(apiType: apiType, config: envConfig)
+        } else if let envFileConfig = loadFromEnvFile() {
+            let apiType = envFileConfig.value(forKey: "API_TYPE") ?? "OpenAI"
+            return getLLMClient(apiType: apiType, config: envFileConfig)
+        } else {
+            // If no configuration is found, default to OpenAI with environment variables
+            return getFromEnvironmentVariables(apiType: "OpenAI")
+        }
+    }
+    
     /// Creates an LLM client based on the specified API type and configuration.
     /// If no config is provided, it tries to load from .env file, then falls back to environment variables.
     /// - Parameters:
@@ -183,21 +200,6 @@ public class ClientFactory {
         return config.isEmpty() ? nil : config
     }
 
-    /// Creates a default LLM client based on available configuration.
-    /// It checks environment variables and .env file, defaulting to OpenAI if no specific configuration is found.
-    /// - Returns: An LLMClient instance if successful, nil otherwise.
-    public static func getDefaultClient() -> LLMClient? {
-        if let envConfig = generateConfigFromEnvironment() {
-            let apiType = envConfig.value(forKey: "API_TYPE") ?? "OpenAI"
-            return getLLMClient(apiType: apiType, config: envConfig)
-        } else if let envFileConfig = loadFromEnvFile() {
-            let apiType = envFileConfig.value(forKey: "API_TYPE") ?? "OpenAI"
-            return getLLMClient(apiType: apiType, config: envFileConfig)
-        } else {
-            // If no configuration is found, default to OpenAI with environment variables
-            return getFromEnvironmentVariables(apiType: "OpenAI")
-        }
-    }
 }
 
 private enum ConfigSource {
