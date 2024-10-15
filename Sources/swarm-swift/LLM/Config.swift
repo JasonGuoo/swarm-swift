@@ -1,27 +1,23 @@
 import Foundation
 
 public class Config {
-    static let shared = Config()
+    private var config: [String: String] = [:]
 
-    private var config: [String: Any]?
+    public init() {}
 
-    init() {
-        if let path = Bundle.main.path(forResource: "config", ofType: "plist") {
-            config = NSDictionary(contentsOfFile: path) as? [String: Any]
-        }
-        
-        // print("Config initialization completed")
+    public func value(forKey key: String) -> String? {
+        return config[key]
     }
 
-    func value(forKey key: String) -> String? {
-        return config?[key] as? String
+    public func setValue(forKey key: String, value: String) {
+        config[key] = value
     }
 
-    func setValue(forKey key:String, value: String) {
-        config?[key] = value
+    public func isEmpty() -> Bool {
+        return config.isEmpty
     }
 
-    func isEmpty() -> Bool {
-        return config?.isEmpty ?? true
+    public var description: String {
+        return config.map { key, value in "\(key)=\(value)" }.joined(separator: "\n")
     }
 }

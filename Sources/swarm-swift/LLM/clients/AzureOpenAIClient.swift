@@ -16,15 +16,33 @@ public class AzureOpenAIClient: LLMClient {
             return
         }
 
+        #if DEBUG
+        print("Request URL: \(url.absoluteString)")
+        #endif
+
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue(apiKey, forHTTPHeaderField: "api-key")
 
+        #if DEBUG
+        print("Request Headers:")
+        urlRequest.allHTTPHeaderFields?.forEach { key, value in
+            print("  \(key): \(value)")
+        }
+        #endif
+
         do {
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
-            urlRequest.httpBody = try encoder.encode(request)
+            let jsonData = try encoder.encode(request)
+            urlRequest.httpBody = jsonData
+            #if DEBUG
+            print("Request Body:")
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                print(jsonString)
+            }
+            #endif
         } catch {
             completion(.failure(error))
             return
@@ -32,14 +50,37 @@ public class AzureOpenAIClient: LLMClient {
 
         let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
             if let error = error {
+                #if DEBUG
+                print("Network Error: \(error.localizedDescription)")
+                #endif
                 completion(.failure(error))
                 return
             }
 
+            #if DEBUG
+            if let httpResponse = response as? HTTPURLResponse {
+                print("HTTP Status Code: \(httpResponse.statusCode)")
+                print("Response Headers:")
+                httpResponse.allHeaderFields.forEach { key, value in
+                    print("  \(key): \(value)")
+                }
+            }
+            #endif
+
             guard let data = data else {
+                #if DEBUG
+                print("No data received")
+                #endif
                 completion(.failure(LLMError.requestFailed))
                 return
             }
+
+            #if DEBUG
+            print("Raw Response Data:")
+            if let rawResponse = String(data: data, encoding: .utf8) {
+                print(rawResponse)
+            }
+            #endif
 
             do {
                 let decoder = JSONDecoder()
@@ -47,6 +88,9 @@ public class AzureOpenAIClient: LLMClient {
                 let apiResponse = try decoder.decode(LLMResponse.self, from: data)
                 completion(.success(apiResponse))
             } catch {
+                #if DEBUG
+                print("Decoding Error: \(error.localizedDescription)")
+                #endif
                 completion(.failure(error))
             }
         }
@@ -59,11 +103,22 @@ public class AzureOpenAIClient: LLMClient {
             completion(.failure(LLMError.invalidURL))
             return
         }
+        
+        #if DEBUG
+        print("Request URL: \(url.absoluteString)")
+        #endif
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue(apiKey, forHTTPHeaderField: "api-key")
+        
+        #if DEBUG
+        print("Request Headers:")
+        urlRequest.allHTTPHeaderFields?.forEach { key, value in
+            print("  \(key): \(value)")
+        }
+        #endif
 
         let completionRequest = [
             "prompt": request.messages.last?.content ?? "",
@@ -72,7 +127,14 @@ public class AzureOpenAIClient: LLMClient {
         ] as [String : Any]
 
         do {
-            urlRequest.httpBody = try JSONSerialization.data(withJSONObject: completionRequest)
+            let jsonData = try JSONSerialization.data(withJSONObject: completionRequest, options: .prettyPrinted)
+            urlRequest.httpBody = jsonData
+            #if DEBUG
+            print("Request Body:")
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                print(jsonString)
+            }
+            #endif
         } catch {
             completion(.failure(error))
             return
@@ -80,14 +142,37 @@ public class AzureOpenAIClient: LLMClient {
 
         let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
             if let error = error {
+                #if DEBUG
+                print("Network Error: \(error.localizedDescription)")
+                #endif
                 completion(.failure(error))
                 return
             }
 
+            #if DEBUG
+            if let httpResponse = response as? HTTPURLResponse {
+                print("HTTP Status Code: \(httpResponse.statusCode)")
+                print("Response Headers:")
+                httpResponse.allHeaderFields.forEach { key, value in
+                    print("  \(key): \(value)")
+                }
+            }
+            #endif
+
             guard let data = data else {
+                #if DEBUG
+                print("No data received")
+                #endif
                 completion(.failure(LLMError.requestFailed))
                 return
             }
+
+            #if DEBUG
+            print("Raw Response Data:")
+            if let rawResponse = String(data: data, encoding: .utf8) {
+                print(rawResponse)
+            }
+            #endif
 
             do {
                 let decoder = JSONDecoder()
@@ -95,6 +180,9 @@ public class AzureOpenAIClient: LLMClient {
                 let apiResponse = try decoder.decode(LLMResponse.self, from: data)
                 completion(.success(apiResponse))
             } catch {
+                #if DEBUG
+                print("Decoding Error: \(error.localizedDescription)")
+                #endif
                 completion(.failure(error))
             }
         }

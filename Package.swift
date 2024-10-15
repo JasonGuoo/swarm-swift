@@ -29,6 +29,10 @@ let package = Package(
             dependencies: []),
         .testTarget(
             name: "swarm-swiftTests",
-            dependencies: ["swarm-swift"]),
+            dependencies: ["swarm-swift"],
+            swiftSettings: [
+                .define("DEBUG", .when(configuration: .debug)),
+                .define("RELEASE", .when(configuration: .release))
+            ]),
     ]
 )
