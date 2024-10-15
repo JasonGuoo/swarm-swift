@@ -1,6 +1,6 @@
 import Foundation
 
-public class AzureOpenAIClient: LLMClient {
+public class AzureOpenAIClient: OpenAIClient {
     let apiVersion: String
     let deploymentId: String
 
@@ -10,6 +10,10 @@ public class AzureOpenAIClient: LLMClient {
         super.init(apiKey: apiKey, baseURL: baseURL)
     }
 
+    /// Creates a chat completion using the Azure OpenAI API.
+    /// - Parameters:
+    ///   - request: The LLMRequest containing the chat messages and parameters.
+    ///   - completion: A closure to be called with the result of the API call.
     override func createChatCompletion(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/openai/deployments/\(deploymentId)/chat/completions?api-version=\(apiVersion)") else {
             completion(.failure(LLMError.invalidURL))
@@ -28,7 +32,12 @@ public class AzureOpenAIClient: LLMClient {
         #if DEBUG
         print("Request Headers:")
         urlRequest.allHTTPHeaderFields?.forEach { key, value in
-            print("  \(key): \(value)")
+            if key.lowercased() == "api-key" {
+                let maskedValue = String(value.prefix(4)) + String(repeating: "*", count: max(0, value.count - 4))
+                print("  \(key): \(maskedValue)")
+            } else {
+                print("  \(key): \(value)")
+            }
         }
         #endif
 
@@ -101,6 +110,10 @@ public class AzureOpenAIClient: LLMClient {
         task.resume()
     }
 
+    /// Creates a text completion using the Azure OpenAI API.
+    /// - Parameters:
+    ///   - request: The LLMRequest containing the prompt and parameters.
+    ///   - completion: A closure to be called with the result of the API call.
     override func createCompletion(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/openai/deployments/\(deploymentId)/completions?api-version=\(apiVersion)") else {
             completion(.failure(LLMError.invalidURL))
@@ -119,7 +132,12 @@ public class AzureOpenAIClient: LLMClient {
         #if DEBUG
         print("Request Headers:")
         urlRequest.allHTTPHeaderFields?.forEach { key, value in
-            print("  \(key): \(value)")
+            if key.lowercased() == "api-key" {
+                let maskedValue = String(value.prefix(4)) + String(repeating: "*", count: max(0, value.count - 4))
+                print("  \(key): \(maskedValue)")
+            } else {
+                print("  \(key): \(value)")
+            }
         }
         #endif
 
@@ -193,6 +211,10 @@ public class AzureOpenAIClient: LLMClient {
         task.resume()
     }
 
+    /// Creates an embedding using the Azure OpenAI API.
+    /// - Parameters:
+    ///   - request: The LLMRequest containing the text to be embedded.
+    ///   - completion: A closure to be called with the result of the API call.
     override func createEmbedding(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/openai/deployments/\(deploymentId)/embeddings?api-version=\(apiVersion)") else {
             completion(.failure(LLMError.invalidURL))
@@ -259,6 +281,8 @@ public class AzureOpenAIClient: LLMClient {
     // Other methods (createImage, createSpeech, createTranscription, createTranslation) 
     // can remain unchanged or be adjusted based on Azure OpenAI's support
 
+    /// Applies default values to an LLMRequest if certain parameters are not set.
+    /// - Parameter request: The LLMRequest to be modified.
     private func applyDefaultValues(_ request: inout LLMRequest) {
         request.maxTokens = request.maxTokens ?? 4096
         request.temperature = request.temperature ?? 0.7
@@ -268,6 +292,8 @@ public class AzureOpenAIClient: LLMClient {
         request.stop = request.stop ?? []
     }
 
+    /// Represents a request for text completion to be sent to the Azure OpenAI API.
+    /// This struct is used to format the request body according to the API's requirements.
     private struct CompletionRequest: Codable {
         let prompt: String
         let maxTokens: Int
@@ -277,9 +303,11 @@ public class AzureOpenAIClient: LLMClient {
         let presencePenalty: Double
         let stop: [String]
 
+        /// Initializes a CompletionRequest from an LLMRequest, applying default values where necessary.
+        /// - Parameter request: The LLMRequest to convert into a CompletionRequest.
         init(from request: LLMRequest) {
             self.prompt = request.messages.last?.content ?? ""
-            self.maxTokens = request.maxTokens ?? 4096
+            self.maxTokens = request.maxTokens ?? 100
             self.temperature = request.temperature ?? 0.7
             self.topP = request.topP ?? 1.0
             self.frequencyPenalty = request.frequencyPenalty ?? 0.0

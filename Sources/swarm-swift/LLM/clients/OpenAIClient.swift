@@ -2,167 +2,23 @@ import Foundation
 import AVFoundation
 
 public class OpenAIClient: LLMClient {
-    override init(apiKey: String, baseURL: String) {
+    override public init(apiKey: String, baseURL: String) {
         super.init(apiKey: apiKey, baseURL: baseURL)
     }
 
     override func createChatCompletion(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
-        guard let url = URL(string: baseURL) else {
-            completion(.failure(LLMError.invalidURL))
-            return
-        }
-        print("baseURL: \(baseURL)")
-
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        do {
-            let encoder = JSONEncoder()
-            encoder.keyEncodingStrategy = .convertToSnakeCase
-            urlRequest.httpBody = try encoder.encode(request)
-        } catch {
-            completion(.failure(error))
-            return
-        }
-
-        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-
-            guard let data = data else {
-                completion(.failure(LLMError.requestFailed))
-                return
-            }
-
-            do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let apiResponse = try decoder.decode(LLMResponse.self, from: data)
-                completion(.success(apiResponse))
-            } catch {
-                completion(.failure(error))
-            }
-        }
-
-        task.resume()
+        let endpoint = "\(baseURL)/chat/completions"
+        performRequest(request: request, endpoint: endpoint, completion: completion)
     }
 
     override func createCompletion(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/completions") else {
-            completion(.failure(LLMError.invalidURL))
-            return
-        }
-
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let completionRequest = [
-            "model": request.model,
-            "prompt": request.messages.last?.content ?? "",
-            "max_tokens": request.maxTokens ?? 100,
-            "temperature": request.temperature ?? 0.7
-        ] as [String : Any]
-
-        do {
-            urlRequest.httpBody = try JSONSerialization.data(withJSONObject: completionRequest)
-        } catch {
-            completion(.failure(error))
-            return
-        }
-
-        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-
-            guard let data = data else {
-                completion(.failure(LLMError.requestFailed))
-                return
-            }
-
-            do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let apiResponse = try decoder.decode(LLMResponse.self, from: data)
-                completion(.success(apiResponse))
-            } catch {
-                completion(.failure(error))
-            }
-        }
-
-        task.resume()
+        let endpoint = "\(baseURL)/completions"
+        performRequest(request: request, endpoint: endpoint, completion: completion)
     }
 
     override func createEmbedding(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/embeddings") else {
-            completion(.failure(LLMError.invalidURL))
-            return
-        }
-
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let embeddingRequest: [String: Any] = [
-            "model": request.model,
-            "input": request.messages.last?.content ?? "",
-            "user": request.user ?? ""
-        ]
-
-        do {
-            urlRequest.httpBody = try JSONSerialization.data(withJSONObject: embeddingRequest)
-        } catch {
-            completion(.failure(error))
-            return
-        }
-
-        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-
-            guard let data = data else {
-                completion(.failure(LLMError.requestFailed))
-                return
-            }
-
-            do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let embeddingResponse = try decoder.decode(EmbeddingResponse.self, from: data)
-                
-                // Convert EmbeddingResponse to LLMResponse
-                let llmResponse = LLMResponse(
-                    id: embeddingResponse.id,
-                    object: embeddingResponse.object,
-                    created: embeddingResponse.created,
-                    model: embeddingResponse.model,
-                    choices: [], // Embedding doesn't use choices
-                    usage: LLMResponse.Usage(
-                        promptTokens: embeddingResponse.usage.promptTokens,
-                        completionTokens: 0, // Embedding doesn't use completionTokens
-                        totalTokens: embeddingResponse.usage.totalTokens
-                    ),
-                    systemFingerprint: nil,
-                    error: nil
-                )
-                
-                completion(.success(llmResponse))
-            } catch {
-                completion(.failure(error))
-            }
-        }
-
-        task.resume()
+        let endpoint = "\(baseURL)/embeddings"
+        performRequest(request: request, endpoint: endpoint, completion: completion)
     }
 
     override func createImage(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
@@ -358,6 +214,99 @@ public class OpenAIClient: LLMClient {
                 
                 completion(.success(llmResponse))
             } catch {
+                completion(.failure(error))
+            }
+        }
+
+        task.resume()
+    }
+
+    internal func performRequest(request: LLMRequest, endpoint: String, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
+        guard let url = URL(string: endpoint) else {
+            completion(.failure(LLMError.invalidURL))
+            return
+        }
+
+        #if DEBUG
+        print("Request URL: \(url.absoluteString)")
+        #endif
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        #if DEBUG
+        print("Request Headers:")
+        urlRequest.allHTTPHeaderFields?.forEach { key, value in
+            if key.lowercased() == "authorization" {
+                let maskedValue = "Bearer " + String(repeating: "*", count: max(0, apiKey.count))
+                print("  \(key): \(maskedValue)")
+            } else {
+                print("  \(key): \(value)")
+            }
+        }
+        #endif
+
+        do {
+            let encoder = JSONEncoder()
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            let jsonData = try encoder.encode(request)
+            urlRequest.httpBody = jsonData
+            #if DEBUG
+            print("Request Body:")
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                print(jsonString)
+            }
+            #endif
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
+            if let error = error {
+                #if DEBUG
+                print("Network Error: \(error.localizedDescription)")
+                #endif
+                completion(.failure(error))
+                return
+            }
+
+            #if DEBUG
+            if let httpResponse = response as? HTTPURLResponse {
+                print("HTTP Status Code: \(httpResponse.statusCode)")
+                print("Response Headers:")
+                httpResponse.allHeaderFields.forEach { key, value in
+                    print("  \(key): \(value)")
+                }
+            }
+            #endif
+
+            guard let data = data else {
+                #if DEBUG
+                print("No data received")
+                #endif
+                completion(.failure(LLMError.requestFailed))
+                return
+            }
+
+            #if DEBUG
+            print("Raw Response Data:")
+            if let rawResponse = String(data: data, encoding: .utf8) {
+                print(rawResponse)
+            }
+            #endif
+
+            do {
+                let decoder = JSONDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                let apiResponse = try decoder.decode(LLMResponse.self, from: data)
+                completion(.success(apiResponse))
+            } catch {
+                #if DEBUG
+                print("Decoding Error: \(error.localizedDescription)")
+                #endif
                 completion(.failure(error))
             }
         }
