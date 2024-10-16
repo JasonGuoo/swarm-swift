@@ -1,7 +1,7 @@
 import Foundation
 
 public struct LLMRequest: Codable {
-    public static let defaultMaxTokens = 8092
+    public static let defaultMaxTokens = 4096
     public static let defaultTemperature = 0.7
     public static let defaultTopP = 1.0
     public static let defaultFrequencyPenalty = 0.0
@@ -263,7 +263,7 @@ public struct LLMRequest: Codable {
         model: String,
         messages: [[String: String]],
         tools: [Tool]? = nil,
-        toolChoice: String? = "auto",
+        toolChoice: String? = nil,
         temperature: Double? = LLMRequest.defaultTemperature,
         maxTokens: Int? = defaultMaxTokens,
         stream: Bool? = false,
