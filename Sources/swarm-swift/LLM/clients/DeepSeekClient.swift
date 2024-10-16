@@ -44,7 +44,7 @@ public class DeepSeekClient: LLMClient {
                    let choices = json["choices"] as? [[String: Any]],
                    let message = choices.first?["message"] as? [String: Any],
                    let content = message["content"] as? String {
-                    let response = LLMResponse(id: "", object: "", created: 0, model: "", choices: [LLMResponse.Choice(index: 0, message: LLMRequest.Message(role: "", content: content), finishReason: nil)], usage: nil, systemFingerprint: nil, error: nil)
+                    let response = LLMResponse(id: "", object: "", created: 0, model: "", choices: [LLMResponse.Choice(index: 0, message: LLMResponse.Message(role: "", content: content, toolCalls: nil), finishReason: nil)], usage: nil, systemFingerprint: nil, error: nil)
                     completion(.success(response))
                 } else {
                     completion(.failure(LLMError.decodingFailed))
@@ -97,7 +97,7 @@ public class DeepSeekClient: LLMClient {
                 if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                    let choices = json["choices"] as? [[String: Any]],
                    let text = choices.first?["text"] as? String {
-                    let response = LLMResponse(id: "", object: "", created: 0, model: "", choices: [LLMResponse.Choice(index: 0, message: LLMRequest.Message(role: "assistant", content: text), finishReason: nil)], usage: nil, systemFingerprint: nil, error: nil)
+                    let response = LLMResponse(id: "", object: "", created: 0, model: "", choices: [LLMResponse.Choice(index: 0, message: LLMResponse.Message(role: "assistant", content: text, toolCalls: nil), finishReason: nil)], usage: nil, systemFingerprint: nil, error: nil)
                     completion(.success(response))
                 } else {
                     completion(.failure(LLMError.decodingFailed))

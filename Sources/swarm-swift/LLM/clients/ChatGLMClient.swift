@@ -61,7 +61,7 @@ public class ChatGLMClient: LLMClient {
             }
             
             guard let data = data else {
-                    completion(.failure(LLMError.requestFailed))
+                completion(.failure(LLMError.requestFailed))
                 return
             }
             
@@ -77,7 +77,7 @@ public class ChatGLMClient: LLMClient {
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let apiResponse = try decoder.decode(ChatGLMResponse.self, from: data)
             
-            let aiResponse = LLMResponse(
+            let llmResponse = LLMResponse(
                 id: apiResponse.id,
                 object: apiResponse.object,
                 created: apiResponse.created,
@@ -85,7 +85,11 @@ public class ChatGLMClient: LLMClient {
                 choices: apiResponse.choices.map { choice in
                     LLMResponse.Choice(
                         index: choice.index,
-                        message: LLMRequest.Message(role: choice.message.role, content: choice.message.content),
+                        message: LLMResponse.Message(
+                            role: choice.message.role,
+                            content: choice.message.content,
+                            toolCalls: nil  // Add this line, set to nil if ChatGLM doesn't support tool calls
+                        ),
                         finishReason: choice.finishReason
                     )
                 },
@@ -98,9 +102,9 @@ public class ChatGLMClient: LLMClient {
                 error: nil
             )
             
-            completion(.success(aiResponse))
+            completion(.success(llmResponse))
         } catch {
-            completion(.failure(error))
+            completion(.failure(LLMError.decodingFailed))
         }
     }
     

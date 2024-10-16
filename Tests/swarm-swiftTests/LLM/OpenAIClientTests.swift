@@ -15,43 +15,52 @@ class OpenAIClientTests: XCTestCase {
         super.tearDown()
     }
     
-    func testCreateChatCompletion() async throws {
-        guard let client = client else {
-            XCTFail("Failed to initialize OpenAI client")
-            return
-        }
+    func testCreateChatCompletion() {
+        let expectation = self.expectation(description: "Chat completion")
         
-        let message = LLMRequest.Message(role: "user", content: "Hello, OpenAI!")
-        let request = LLMRequest(model: "gpt-3.5-turbo", messages: [message])
+        let request = LLMRequest.create(
+            model: "gpt-3.5-turbo",
+            messages: [
+                ["system": "You are a helpful assistant."],
+                ["user": "What is the capital of France?"]
+            ],
+            temperature: 0.7,
+            maxTokens: 150,
+            additionalParameters: ["top_p": 1.0, "frequency_penalty": 0.0, "presence_penalty": 0.0]
+        )
         
-        do {
-            let response = try await client.createChatCompletion(request: request) { result in
-                switch result {
-                case .success(let llmResponse):
-                    XCTAssertFalse(llmResponse.choices.isEmpty, "Response should not be empty")
-                    print("OpenAI response:")
-                    print("ID: \(llmResponse.id)")
-                    print("Model: \(llmResponse.model)")
-                    print("Choices:")
-                    for choice in llmResponse.choices {
-                        print("  Content: \(choice.message.content)")
-                        print("  Finish Reason: \(choice.finishReason ?? "N/A")")
-                    }
-                    if let usage = llmResponse.usage {
-                        print("Usage:")
-                        print("  Prompt Tokens: \(usage.promptTokens)")
-                        print("  Completion Tokens: \(usage.completionTokens)")
-                        print("  Total Tokens: \(usage.totalTokens)")
-                    }
-                case .failure(let error):
-                    XCTFail("OpenAI request failed: \(error.localizedDescription)")
+        client.createChatCompletion(request: request) { result in
+            switch result {
+            case .success(let response):
+                print(" ======== Full response: =======")
+                print(response)
+                print(" ======== End of response =======")
+                XCTAssertFalse(response.isEmpty, "Response should not be empty")
+//                XCTAssertEqual(response.object, "chat.completion", "Object should be chat.completion")
+                XCTAssertNotNil(response.id, "Response should have an ID")
+                XCTAssertNotNil(response.created, "Response should have a creation timestamp")
+//                XCTAssertEqual(response.model, "gpt-3.5-turbo", "Model should match the request") 
+                
+                XCTAssertFalse(response.choices?.isEmpty ?? true, "Choices should not be empty")
+                if let firstChoice = response.choices?.first {
+                    XCTAssertEqual(firstChoice.index, 0, "First choice should have index 0")
+                    XCTAssertEqual(firstChoice.message?.role, "assistant", "Message role should be assistant")
+                    XCTAssertNotNil(firstChoice.message?.content, "Message should have content")
+                    XCTAssertTrue(firstChoice.message?.content?.contains("Paris") ?? false, "Content should mention Paris")
+                    XCTAssertEqual(firstChoice.finishReason, "stop", "Finish reason should be 'stop'")
                 }
+                
+                XCTAssertNotNil(response.usage, "Response should include usage information")
+                XCTAssertNotNil(response.usage?.promptTokens, "Usage should include prompt tokens")
+                XCTAssertNotNil(response.usage?.completionTokens, "Usage should include completion tokens")
+                XCTAssertNotNil(response.usage?.totalTokens, "Usage should include total tokens")
+                
+            case .failure(let error):
+                XCTFail("Chat completion failed with error: \(error)")
             }
-            XCTAssertNotNil(response)
-        } catch let error as LLMError {
-            XCTFail("LLMError: \(error.localizedDescription)")
-        } catch {
-            XCTFail("Unexpected error: \(error.localizedDescription)")
+            expectation.fulfill()
         }
+        
+        waitForExpectations(timeout: 20, handler: nil)
     }
 }

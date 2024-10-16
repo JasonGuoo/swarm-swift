@@ -26,17 +26,65 @@ public struct LLMRequest: Codable {
     public var fileData: Data?
     public var fileName: String?
     public var language: String?
+    public var tools: [Tool]?
+    public var toolChoice: String?
 
     public struct Message: Codable {
         public var role: String
-        public var content: String
+        public var content: String?
         public var name: String?
 
-        public init(role: String, content: String, name: String? = nil) {
+        public init(role: String, content: String? = nil, name: String? = nil) {
             self.role = role
             self.content = content
             self.name = name
         }
+    }
+
+    public struct Tool: Codable {
+        public var type: String
+        public var function: Function
+    }
+
+    public struct Function: Codable {
+        public var name: String
+        public var description: String
+        public var parameters: Parameters
+    }
+
+    public struct Parameters: Codable {
+        public var type: String
+        public var properties: [String: Property]
+        public var required: [String]
+    }
+
+    public struct Property: Codable {
+        public var type: String
+        public var description: String?
+        public var enums: [String]?
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case messages
+        case temperature
+        case topP = "top_p"
+        case n
+        case stream
+        case stop
+        case maxTokens = "max_tokens"
+        case presencePenalty = "presence_penalty"
+        case frequencyPenalty = "frequency_penalty"
+        case logitBias = "logit_bias"
+        case user
+        case voice
+        case responseFormat = "response_format"
+        case speed
+        case fileData = "file_data"
+        case fileName = "file_name"
+        case language
+        case tools
+        case toolChoice = "tool_choice"
     }
 
     public init(
@@ -57,7 +105,9 @@ public struct LLMRequest: Codable {
         speed: Double? = nil,
         fileData: Data? = nil,
         fileName: String? = nil,
-        language: String? = nil
+        language: String? = nil,
+        tools: [Tool]? = nil,
+        toolChoice: String? = nil
     ) {
         self.model = model
         self.messages = messages
@@ -77,6 +127,8 @@ public struct LLMRequest: Codable {
         self.fileData = fileData
         self.fileName = fileName
         self.language = language
+        self.tools = tools
+        self.toolChoice = toolChoice
     }
     
     public var description: String {
@@ -84,7 +136,7 @@ public struct LLMRequest: Codable {
         desc += "  Model: \(model)\n"
         desc += "  Messages:\n"
         for message in messages {
-            desc += "    Role: \(message.role), Content: \(message.content)\(message.name != nil ? ", Name: \(message.name!)" : "")\n"
+            desc += "    Role: \(message.role), Content: \(message.content ?? ""), Name: \(message.name ?? "")\n"
         }
         if let temperature = temperature { desc += "  Temperature: \(temperature)\n" }
         if let topP = topP { desc += "  Top P: \(topP)\n" }
@@ -102,6 +154,32 @@ public struct LLMRequest: Codable {
         if fileData != nil { desc += "  File Data: [Data]\n" }
         if let fileName = fileName { desc += "  File Name: \(fileName)\n" }
         if let language = language { desc += "  Language: \(language)\n" }
+        if let tools = tools {
+            desc += "  Tools:\n"
+            for tool in tools {
+                desc += "    Type: \(tool.type)\n"
+                desc += "    Function:\n"
+                desc += "      Name: \(tool.function.name)\n"
+                desc += "      Description: \(tool.function.description)\n"
+                desc += "      Parameters:\n"
+                desc += "        Type: \(tool.function.parameters.type)\n"
+                desc += "        Properties:\n"
+                for (key, property) in tool.function.parameters.properties {
+                    desc += "          \(key):\n"
+                    desc += "            Type: \(property.type)\n"
+                    if let description = property.description {
+                        desc += "            Description: \(description)\n"
+                    }
+                    if let enumValues = property.enums {
+                        desc += "            Enum: \(enumValues)\n"
+                    }
+                }
+                desc += "        Required: \(tool.function.parameters.required)\n"
+            }
+        }
+        if let toolChoice = toolChoice {
+            desc += "  Tool Choice: \(toolChoice)\n"
+        }
         return desc
     }
 
@@ -137,7 +215,9 @@ public struct LLMRequest: Codable {
         temperature: Double = 0.7,
         maxTokens: Int = LLMRequest.defaultMaxTokens,
         stream: Bool = false,
-        additionalParameters: [String: Any] = [:]
+        additionalParameters: [String: Any] = [:],
+        tools: [Tool]? = nil,
+        toolChoice: String? = nil
     ) -> LLMRequest {
         let formattedMessages = messages.map { dict -> Message in
             let role = dict.keys.first ?? "user"
@@ -150,8 +230,9 @@ public struct LLMRequest: Codable {
             messages: formattedMessages,
             temperature: temperature,
             stream: stream,
-            maxTokens: maxTokens
-            
+            maxTokens: maxTokens,
+            tools: tools,
+            toolChoice: toolChoice
         )
         
         // Apply additional parameters
@@ -271,10 +352,45 @@ public struct LLMRequest: Codable {
             request.language = language
         }
         
+        if let toolsArray = json["tools"] as? [[String: Any]] {
+            request.tools = try toolsArray.map { toolDict in
+                guard let type = toolDict["type"] as? String,
+                      let functionDict = toolDict["function"] as? [String: Any],
+                      let name = functionDict["name"] as? String,
+                      let description = functionDict["description"] as? String,
+                      let parametersDict = functionDict["parameters"] as? [String: Any],
+                      let parametersType = parametersDict["type"] as? String,
+                      let propertiesDict = parametersDict["properties"] as? [String: [String: Any]],
+                      let required = parametersDict["required"] as? [String] else {
+                    throw LLMRequestError.invalidToolFormat
+                }
+                
+                let properties = try propertiesDict.mapValues { propertyDict -> Property in
+                    guard let type = propertyDict["type"] as? String else {
+                        throw LLMRequestError.invalidToolFormat
+                    }
+                    return Property(
+                        type: type,
+                        description: propertyDict["description"] as? String,
+                        enums: propertyDict["enums"] as? [String]
+                    )
+                }
+                
+                let parameters = Parameters(type: parametersType, properties: properties, required: required)
+                let function = Function(name: name, description: description, parameters: parameters)
+                return Tool(type: type, function: function)
+            }
+        }
+        
+        if let toolChoice = json["tool_choice"] as? String {
+            request.toolChoice = toolChoice
+        }
+        
         return request
     }
 }
 
 public enum LLMRequestError: Error {
     case missingRequiredField(String)
+    case invalidToolFormat
 }

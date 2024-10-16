@@ -43,7 +43,7 @@ public class OllamaClient: LLMClient {
             do {
                 if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                    let generatedText = json["response"] as? String {
-                    let response = LLMResponse(id: "", object: "", created: 0, model: "", choices: [LLMResponse.Choice(index: 0, message: LLMRequest.Message(role: "", content: generatedText), finishReason: nil)], usage: nil, systemFingerprint: nil, error: nil)
+                    let response = LLMResponse(id: "", object: "", created: 0, model: "", choices: [LLMResponse.Choice(index: 0, message: LLMResponse.Message(role: "", content: generatedText, toolCalls: nil), finishReason: nil)], usage: nil, systemFingerprint: nil, error: nil)
                     completion(.success(response))
                 } else {
                     completion(.failure(LLMError.decodingFailed))
@@ -97,7 +97,7 @@ public class OllamaClient: LLMClient {
             do {
                 if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                    let generatedText = json["response"] as? String {
-                    let response = LLMResponse(id: "", object: "", created: 0, model: "", choices: [LLMResponse.Choice(index: 0, message: LLMRequest.Message(role: "assistant", content: generatedText), finishReason: nil)], usage: nil, systemFingerprint: nil, error: nil)
+                    let response = LLMResponse(id: "", object: "", created: 0, model: request.model, choices: [LLMResponse.Choice(index: 0, message: LLMResponse.Message(role: "", content: generatedText, toolCalls: nil), finishReason: nil)], usage: nil, systemFingerprint: nil, error: nil)
                     completion(.success(response))
                 } else {
                     completion(.failure(LLMError.decodingFailed))

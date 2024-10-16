@@ -103,4 +103,30 @@ final class ClientFactoryTests: XCTestCase {
         XCTAssertTrue(client is OpenAIClient)
         print("Successfully fell back to OpenAIClient for invalid API type")
     }
+    
+    func testGetAzureOpenAIClient() {
+        print("\n--- Testing AzureOpenAI client generation ---")
+        let config = TestUtils.loadConfig(for: "AzureOpenAI")
+        
+        // Print the content of the config
+        print("AzureOpenAI config:")
+        print(config.description)
+        
+        let client = ClientFactory.getLLMClient(apiType: "AzureOpenAI", config: config)
+        
+        
+        XCTAssertNotNil(client, "AzureOpenAI client should not be nil")
+        XCTAssertTrue(client is AzureOpenAIClient, "Client should be an instance of AzureOpenAIClient")
+        
+        if let azureClient = client as? AzureOpenAIClient {
+            XCTAssertEqual(azureClient.apiKey, config.value(forKey: "AzureOpenAI_API_KEY"), "API key should match the config")
+            XCTAssertEqual(azureClient.baseURL, config.value(forKey: "AzureOpenAI_API_BASE_URL"), "Base URL should match the config")
+            XCTAssertEqual(azureClient.deploymentId, config.value(forKey: "AzureOpenAI_DEPLOYMENT_ID"), "Deployment name should match the config")
+            XCTAssertEqual(azureClient.apiVersion, config.value(forKey: "AzureOpenAI_API_VERSION"), "API version should match the config")
+        } else {
+            XCTFail("Failed to cast client to AzureOpenAIClient")
+        }
+        
+        print("Successfully created and verified AzureOpenAIClient")
+    }
 }

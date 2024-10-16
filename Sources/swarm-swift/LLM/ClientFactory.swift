@@ -40,10 +40,10 @@ public class ClientFactory {
     
     private static func createAzureOpenAIClient(config: Config) -> AzureOpenAIClient? {
         guard let apiKey = config.value(forKey: "AzureOpenAI_API_KEY"),
-              let baseURL = config.value(forKey: "AzureOpenAI_API_BASE_URL"),
+              let endpoint = config.value(forKey: "AzureOpenAI_API_BASE_URL"),
               let apiVersion = config.value(forKey: "AzureOpenAI_API_VERSION"),
               let deploymentId = config.value(forKey: "AzureOpenAI_DEPLOYMENT_ID") else { return nil }
-        return AzureOpenAIClient(apiKey: apiKey, baseURL: baseURL, apiVersion: apiVersion, deploymentId: deploymentId)
+        return AzureOpenAIClient(apiKey: apiKey, endpoint: endpoint, apiVersion: apiVersion, deploymentId: deploymentId)
     }
     
     private static func createOllamaClient(config: Config) -> OllamaClient? {

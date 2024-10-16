@@ -26,202 +26,19 @@ public class OpenAIClient: LLMClient {
     }
 
     override func createSpeech(request: LLMRequest, completion: @escaping (Result<Data, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/audio/speech") else {
-            completion(.failure(LLMError.invalidURL))
-            return
-        }
-
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let speechRequest: [String: Any] = [
-            "model": request.model,
-            "input": request.messages.last?.content ?? "",
-            "voice": request.voice ?? "alloy",
-            "response_format": request.responseFormat ?? "mp3",
-            "speed": request.speed ?? 1.0
-        ]
-
-        do {
-            urlRequest.httpBody = try JSONSerialization.data(withJSONObject: speechRequest)
-        } catch {
-            completion(.failure(error))
-            return
-        }
-
-        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-
-            guard let data = data else {
-                completion(.failure(LLMError.requestFailed))
-                return
-            }
-
-            completion(.success(data))
-        }
-
-        task.resume()
+        completion(.failure(LLMError.unsupportedOperation("Speech creation is not supported for OpenAI API in this implementation")))
     }
 
     override func createTranscription(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/audio/transcriptions") else {
-            completion(.failure(LLMError.invalidURL))
-            return
-        }
-
-        let boundary = UUID().uuidString
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        var body = Data()
-
-        // Add file data
-        if let fileData = request.fileData, let fileName = request.fileName {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: audio/mpeg\r\n\r\n".data(using: .utf8)!)
-            body.append(fileData)
-            body.append("\r\n".data(using: .utf8)!)
-        }
-
-        // Add other parameters
-        let parameters: [String: Any] = [
-            "model": request.model,
-            "language": request.language ?? "",
-            "prompt": request.messages.last?.content ?? "",
-            "response_format": request.responseFormat ?? "json",
-            "temperature": request.temperature ?? 0
-        ]
-
-        for (key, value) in parameters {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n".data(using: .utf8)!)
-            body.append("\(value)\r\n".data(using: .utf8)!)
-        }
-
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        urlRequest.httpBody = body
-
-        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-
-            guard let data = data else {
-                completion(.failure(LLMError.requestFailed))
-                return
-            }
-
-            do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let transcriptionResponse = try decoder.decode(TranscriptionResponse.self, from: data)
-                
-                let llmResponse = LLMResponse(
-                    id: "",
-                    object: "transcription",
-                    created: Int(Date().timeIntervalSince1970),
-                    model: request.model,
-                    choices: [LLMResponse.Choice(index: 0, message: LLMRequest.Message(role: "assistant", content: transcriptionResponse.text), finishReason: "stop")],
-                    usage: nil,
-                    systemFingerprint: nil,
-                    error: nil
-                )
-                
-                completion(.success(llmResponse))
-            } catch {
-                completion(.failure(error))
-            }
-        }
-
-        task.resume()
+        completion(.failure(LLMError.unsupportedOperation("Transcription is not implemented for OpenAI API in this client")))
     }
 
     override func createTranslation(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/audio/translations") else {
-            completion(.failure(LLMError.invalidURL))
-            return
-        }
-
-        let boundary = UUID().uuidString
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        var body = Data()
-
-        // Add file data
-        if let fileData = request.fileData, let fileName = request.fileName {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: audio/mpeg\r\n\r\n".data(using: .utf8)!)
-            body.append(fileData)
-            body.append("\r\n".data(using: .utf8)!)
-        }
-
-        // Add other parameters
-        let parameters: [String: Any] = [
-            "model": request.model,
-            "prompt": request.messages.last?.content ?? "",
-            "response_format": request.responseFormat ?? "json",
-            "temperature": request.temperature ?? 0
-        ]
-
-        for (key, value) in parameters {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n".data(using: .utf8)!)
-            body.append("\(value)\r\n".data(using: .utf8)!)
-        }
-
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        urlRequest.httpBody = body
-
-        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-
-            guard let data = data else {
-                completion(.failure(LLMError.requestFailed))
-                return
-            }
-
-            do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let translationResponse = try decoder.decode(TranslationResponse.self, from: data)
-                
-                let llmResponse = LLMResponse(
-                    id: "",
-                    object: "translation",
-                    created: Int(Date().timeIntervalSince1970),
-                    model: request.model,
-                    choices: [LLMResponse.Choice(index: 0, message: LLMRequest.Message(role: "assistant", content: translationResponse.text), finishReason: "stop")],
-                    usage: nil,
-                    systemFingerprint: nil,
-                    error: nil
-                )
-                
-                completion(.success(llmResponse))
-            } catch {
-                completion(.failure(error))
-            }
-        }
-
-        task.resume()
+        completion(.failure(LLMError.unsupportedOperation("Translation is not implemented for OpenAI API in this client")))
     }
 
     internal func performRequest(request: LLMRequest, endpoint: String, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
+        // Ensure the endpoint URL is valid
         guard let url = URL(string: endpoint) else {
             completion(.failure(LLMError.invalidURL))
             return
@@ -229,6 +46,7 @@ public class OpenAIClient: LLMClient {
 
         DebugUtils.printDebug("Request URL: \(url.absoluteString)")
 
+        // Set up the URLRequest with necessary headers
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -236,6 +54,7 @@ public class OpenAIClient: LLMClient {
 
         DebugUtils.printDebugHeaders(urlRequest.allHTTPHeaderFields ?? [:])
 
+        // Encode the request body
         do {
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -247,18 +66,22 @@ public class OpenAIClient: LLMClient {
             return
         }
 
+        // Create and start the network request
         let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
+            // Handle network errors
             if let error = error {
                 DebugUtils.printDebug("Network Error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
 
+            // Log HTTP response details
             if let httpResponse = response as? HTTPURLResponse {
                 DebugUtils.printDebug("HTTP Status Code: \(httpResponse.statusCode)")
                 DebugUtils.printDebugHeaders(httpResponse.allHeaderFields as? [String: String] ?? [:])
             }
 
+            // Ensure we received data
             guard let data = data else {
                 DebugUtils.printDebug("No data received")
                 completion(.failure(LLMError.requestFailed))
@@ -267,17 +90,27 @@ public class OpenAIClient: LLMClient {
 
             DebugUtils.printDebugJSON(data)
 
-            do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let apiResponse = try decoder.decode(LLMResponse.self, from: data)
-                completion(.success(apiResponse))
-            } catch {
+            // Convert data to JSON string
+            guard let jsonString = String(data: data, encoding: .utf8) else {
+                DebugUtils.printDebug("Failed to convert data to string")
+                completion(.failure(LLMError.decodingFailed))
+                return
+            }
+
+            // Parse the JSON response
+            let result = LLMResponse.fromJSON(jsonString)
+            switch result {
+            case .success(var llmResponse):
+                // Set the object type to "translation" (Note: This might need to be adjusted based on the actual response)
+                llmResponse.object = "translation" 
+                completion(.success(llmResponse))
+            case .failure(let error):
                 DebugUtils.printDebug("Decoding Error: \(error.localizedDescription)")
-                completion(.failure(error))
+                completion(.failure(LLMError.decodingFailed))
             }
         }
 
+        // Start the network request
         task.resume()
     }
 }
