@@ -31,13 +31,11 @@ public struct LLMRequest: Codable {
 
     public struct Message: Codable {
         public var role: String
-        public var content: String?
-        public var name: String?
+        public var content: String
 
-        public init(role: String, content: String? = nil, name: String? = nil) {
+        public init(role: String, content: String) {
             self.role = role
             self.content = content
-            self.name = name
         }
     }
 
@@ -61,7 +59,7 @@ public struct LLMRequest: Codable {
     public struct Property: Codable {
         public var type: String
         public var description: String?
-        public var enums: [String]?
+        public var `enum`: [String]?
     }
 
     enum CodingKeys: String, CodingKey {
@@ -136,7 +134,7 @@ public struct LLMRequest: Codable {
         desc += "  Model: \(model)\n"
         desc += "  Messages:\n"
         for message in messages {
-            desc += "    Role: \(message.role), Content: \(message.content ?? ""), Name: \(message.name ?? "")\n"
+            desc += "    Role: \(message.role), Content: \(message.content)\n"
         }
         if let temperature = temperature { desc += "  Temperature: \(temperature)\n" }
         if let topP = topP { desc += "  Top P: \(topP)\n" }
@@ -170,7 +168,7 @@ public struct LLMRequest: Codable {
                     if let description = property.description {
                         desc += "            Description: \(description)\n"
                     }
-                    if let enumValues = property.enums {
+                    if let enumValues = property.enum {
                         desc += "            Enum: \(enumValues)\n"
                     }
                 }
@@ -187,12 +185,11 @@ public struct LLMRequest: Codable {
     ///
     /// - Parameters:
     ///   - model: The name of the model to use for the request.
-    ///   - messages: An array of dictionaries representing the conversation history.
-    ///               Each dictionary should have a single key-value pair where the key is the role
-    ///               (e.g., "system", "user", "assistant") and the value is the message content.
-    ///   - temperature: Controls randomness in the model's output. Default is 0.7.
-    ///   - maxTokens: The maximum number of tokens to generate. Default is LLMRequest.defaultMaxTokens.
-    ///   - stream: Whether to stream the response. Default is false.
+    ///   - messages: An array of Message structs representing the conversation history.
+    ///               Each Message should have a role (e.g., "system", "user", "assistant") and content.
+    ///   - temperature: Controls randomness in the model's output. Default is LLMRequest.defaultTemperature.
+    ///   - maxTokens: The maximum number of tokens to generate. Default is nil.
+    ///   - stream: Whether to stream the response. Default is nil.
     ///   - additionalParameters: A dictionary of additional parameters to include in the request.
     ///
     /// - Returns: An LLMRequest instance configured with the provided parameters.
@@ -200,10 +197,11 @@ public struct LLMRequest: Codable {
     /// - Example:
     ///   ```swift
     ///   let request = LLMRequest.create(
-    ///       model: "gpt-3.5-turbo",
+    ///       model: "gpt-4",
     ///       messages: [
-    ///           ["system": "You are a helpful assistant."],
-    ///           ["user": "What's the weather like today?"]
+    ///           ["role": "user", "content": "What's the weather like in Boston today?"],
+    ///           ["role": "system", "content": "You are a helpful assistant."],
+    ///           ["role": "assistant", "content": "I'm sorry, but as an AI language model, I don't have access to real-time weather information. To get accurate and up-to-date weather information for Boston, I recommend checking a reliable weather website or app, or contacting a local weather service."]
     ///       ],
     ///       temperature: 0.8,
     ///       additionalParameters: ["top_p": 0.9, "user": "user123"]
@@ -212,22 +210,16 @@ public struct LLMRequest: Codable {
     public static func create(
         model: String,
         messages: [[String: String]],
-        temperature: Double = 0.7,
-        maxTokens: Int = LLMRequest.defaultMaxTokens,
-        stream: Bool = false,
-        additionalParameters: [String: Any] = [:],
         tools: [Tool]? = nil,
-        toolChoice: String? = nil
+        toolChoice: String? = "auto",
+        temperature: Double? = LLMRequest.defaultTemperature,
+        maxTokens: Int? = defaultMaxTokens,
+        stream: Bool? = false,
+        additionalParameters: [String: Any]? = [:]
     ) -> LLMRequest {
-        let formattedMessages = messages.map { dict -> Message in
-            let role = dict.keys.first ?? "user"
-            let content = dict[role] ?? ""
-            return Message(role: role, content: content)
-        }
-        
         var request = LLMRequest(
             model: model,
-            messages: formattedMessages,
+            messages: messages.map { LLMRequest.Message(role: $0["role"]!, content: $0["content"]!) },
             temperature: temperature,
             stream: stream,
             maxTokens: maxTokens,
@@ -236,24 +228,28 @@ public struct LLMRequest: Codable {
         )
         
         // Apply additional parameters
-        for (key, value) in additionalParameters {
-            switch key {
-            case "topP": request.topP = value as? Double
-            case "n": request.n = value as? Int
-            case "stop": request.stop = value as? [String]
-            case "presencePenalty": request.presencePenalty = value as? Double
-            case "frequencyPenalty": request.frequencyPenalty = value as? Double
-            case "logitBias": request.logitBias = value as? [String: Int]
-            case "user": request.user = value as? String
-            case "voice": request.voice = value as? String
-            case "responseFormat": request.responseFormat = value as? String
-            case "speed": request.speed = value as? Double
-            case "fileData": request.fileData = value as? Data
-            case "fileName": request.fileName = value as? String
-            case "language": request.language = value as? String
-            default: break
+        if let additionalParams = additionalParameters {
+            let keys = additionalParams.keys
+            for key in keys {
+                let value = additionalParams[key]
+                switch key {
+                case "topP": request.topP = value as? Double
+                case "n": request.n = value as? Int
+                case "stop": request.stop = value as? [String]
+                case "presencePenalty": request.presencePenalty = value as? Double
+                case "frequencyPenalty": request.frequencyPenalty = value as? Double
+                case "logitBias": request.logitBias = value as? [String: Int]
+                case "user": request.user = value as? String
+                case "voice": request.voice = value as? String
+                case "responseFormat": request.responseFormat = value as? String
+                case "speed": request.speed = value as? Double
+                case "fileData": request.fileData = value as? Data
+                case "fileName": request.fileName = value as? String
+                case "language": request.language = value as? String
+                default: break
+           }
             }
-        }
+       }
         
         return request
     }
@@ -271,8 +267,8 @@ public struct LLMRequest: Codable {
     ///   let jsonData: [String: Any] = [
     ///       "model": "gpt-3.5-turbo",
     ///       "messages": [
-    ///           ["system": "You are a helpful assistant."],
-    ///           ["user": "What's the capital of France?"]
+    ///           ["role": "system", "content": "You are a helpful assistant."],
+    ///           ["role": "user", "content": "What's the capital of France?"]
     ///       ],
     ///       "temperature": 0.7,
     ///       "max_tokens": 1000,
@@ -295,9 +291,10 @@ public struct LLMRequest: Codable {
             throw LLMRequestError.missingRequiredField("messages")
         }
         
-        let messages = messagesArray.map { dict -> Message in
-            let role = dict.keys.first ?? "user"
-            let content = dict[role] ?? ""
+        let messages = messagesArray.compactMap { dict -> Message? in
+            guard let role = dict["role"], let content = dict["content"] else {
+                return nil
+            }
             return Message(role: role, content: content)
         }
         
@@ -365,18 +362,20 @@ public struct LLMRequest: Codable {
                     throw LLMRequestError.invalidToolFormat
                 }
                 
-                let properties = try propertiesDict.mapValues { propertyDict -> Property in
-                    guard let type = propertyDict["type"] as? String else {
-                        throw LLMRequestError.invalidToolFormat
-                    }
-                    return Property(
-                        type: type,
-                        description: propertyDict["description"] as? String,
-                        enums: propertyDict["enums"] as? [String]
+                let orderedProperties = propertiesDict.map { (key, value) -> (String, Property) in
+                    let property = Property(
+                        type: value["type"] as? String ?? "",
+                        description: value["description"] as? String,
+                        `enum`: value["enum"] as? [String]  // 使用反引号来转义 Swift 关键字 "enum"
                     )
+                    return (key, property)
                 }
                 
-                let parameters = Parameters(type: parametersType, properties: properties, required: required)
+                let parameters = Parameters(
+                    type: parametersType,
+                    properties: Dictionary(uniqueKeysWithValues: orderedProperties),
+                    required: required
+                )
                 let function = Function(name: name, description: description, parameters: parameters)
                 return Tool(type: type, function: function)
             }
@@ -388,9 +387,27 @@ public struct LLMRequest: Codable {
         
         return request
     }
+
+    public static func fromJSONString(_ jsonString: String) throws -> LLMRequest {
+        guard let jsonData = jsonString.data(using: .utf8) else {
+            throw LLMRequestError.invalidJSONString
+        }
+        
+        do {
+            if let jsonDict = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+                return try fromJSON(jsonDict)
+            } else {
+                throw LLMRequestError.invalidJSONFormat
+            }
+        } catch {
+            throw LLMRequestError.invalidJSONString
+        }
+    }
 }
 
 public enum LLMRequestError: Error {
+    case invalidJSONFormat
     case missingRequiredField(String)
     case invalidToolFormat
+    case invalidJSONString
 }
