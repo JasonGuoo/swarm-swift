@@ -8,108 +8,16 @@ public class ChatGLMClient: LLMClient {
         case glm4Flash = "glm-4-flash" // Free to use: ZhipuAI's first free API, zero-cost access to large models
     }
     
-    override init(apiKey: String, baseURL: String) {
+    override public init(apiKey: String, baseURL: String) {
         super.init(apiKey: apiKey, baseURL: baseURL)
     }
     
     override func createChatCompletion(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
-        sendMessage(request: request, completion: completion)
-    }
-    
-    func sendMessage(
-        request: LLMRequest,
-        modelType: ModelType = .glm4Flash, // use the free model as default
-        completion: @escaping (Result<LLMResponse, Error>) -> Void
-    ) {
-        let model = modelType.rawValue
-        var parameters: [String: Any] = [
-            "model": model,
-            "messages": request.messages.map { ["role": $0.role, "content": $0.content] },
-            "temperature": request.temperature ?? 0.7,
-            "top_p": request.topP ?? 1,
-            "max_tokens": request.maxTokens ?? 1500,
-            "stream": request.stream ?? false
-        ]
-        
-        if let n = request.n { parameters["n"] = n }
-        if let stop = request.stop { parameters["stop"] = stop }
-        if let presencePenalty = request.presencePenalty { parameters["presence_penalty"] = presencePenalty }
-        if let frequencyPenalty = request.frequencyPenalty { parameters["frequency_penalty"] = frequencyPenalty }
-        if let user = request.user { parameters["user"] = user }
-        
-        guard let url = URL(string: baseURL) else {
-            completion(.failure(LLMError.invalidURL))
-            return
-        }
-        
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        
-        do {
-            urlRequest.httpBody = try JSONSerialization.data(withJSONObject: parameters)
-        } catch {
-            completion(.failure(error))
-            return
-        }
-        
-        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            
-            guard let data = data else {
-                completion(.failure(LLMError.requestFailed))
-                return
-            }
-            
-            self.handleResponse(data: data, completion: completion)
-        }
-        
-        task.resume()
-    }
-    
-    private func handleResponse(data: Data, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
-        do {
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            let apiResponse = try decoder.decode(ChatGLMResponse.self, from: data)
-            
-            let llmResponse = LLMResponse(
-                id: apiResponse.id,
-                object: apiResponse.object,
-                created: apiResponse.created,
-                model: apiResponse.model,
-                choices: apiResponse.choices.map { choice in
-                    LLMResponse.Choice(
-                        index: choice.index,
-                        message: LLMResponse.Message(
-                            role: choice.message.role,
-                            content: choice.message.content,
-                            toolCalls: nil  // Add this line, set to nil if ChatGLM doesn't support tool calls
-                        ),
-                        finishReason: choice.finishReason
-                    )
-                },
-                usage: LLMResponse.Usage(
-                    promptTokens: apiResponse.usage.promptTokens,
-                    completionTokens: apiResponse.usage.completionTokens,
-                    totalTokens: apiResponse.usage.totalTokens
-                ),
-                systemFingerprint: nil,
-                error: nil
-            )
-            
-            completion(.success(llmResponse))
-        } catch {
-            completion(.failure(LLMError.decodingFailed))
-        }
+        let endpoint = "\(baseURL)"
+        performRequest(request: request, endpoint: endpoint, completion: completion)
     }
     
     override func createCompletion(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
-        // ChatGLM API 可能不支持非对话式的完成，所以我们将其转换为对话式请求
         let chatRequest = LLMRequest(
             model: request.model,
             messages: [LLMRequest.Message(role: "user", content: request.messages.last?.content ?? "")],
@@ -133,6 +41,84 @@ public class ChatGLMClient: LLMClient {
 
     override func createTranslation(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
         completion(.failure(LLMError.unsupportedOperation("Translation is not supported for ChatGLM API in this implementation")))
+    }
+
+    internal func performRequest(request: LLMRequest, endpoint: String, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
+        // Ensure the endpoint URL is valid
+        guard let url = URL(string: endpoint) else {
+            completion(.failure(LLMError.invalidURL))
+            return
+        }
+
+        DebugUtils.printDebug("Request URL: \(url.absoluteString)")
+
+        // Set up the URLRequest with necessary headers
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        DebugUtils.printDebugHeaders(urlRequest.allHTTPHeaderFields ?? [:])
+
+        // Encode the request body
+        do {
+            let encoder = JSONEncoder()
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            var modifiedRequest = request
+            modifiedRequest.model = ModelType.glm4Flash.rawValue // Use the default model or allow it to be specified
+            let jsonData = try encoder.encode(modifiedRequest)
+            urlRequest.httpBody = jsonData
+            DebugUtils.printDebugJSON(jsonData)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        // Create and start the network request
+        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
+            // Handle network errors
+            if let error = error {
+                DebugUtils.printDebug("Network Error: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+
+            // Log HTTP response details
+            if let httpResponse = response as? HTTPURLResponse {
+                DebugUtils.printDebug("HTTP Status Code: \(httpResponse.statusCode)")
+                DebugUtils.printDebugHeaders(httpResponse.allHeaderFields as? [String: String] ?? [:])
+            }
+
+            // Ensure we received data
+            guard let data = data else {
+                DebugUtils.printDebug("No data received")
+                completion(.failure(LLMError.requestFailed))
+                return
+            }
+
+            DebugUtils.printDebugJSON(data)
+
+            // Convert data to JSON string
+            guard let jsonString = String(data: data, encoding: .utf8) else {
+                DebugUtils.printDebug("Failed to convert data to string")
+                completion(.failure(LLMError.decodingFailed))
+                return
+            }
+
+            // Parse the JSON response
+            let result = LLMResponse.fromJSON(jsonString)
+            switch result {
+            case .success(var llmResponse):
+                llmResponse.object = "chat.completion"
+                completion(.success(llmResponse))
+            case .failure(let error):
+                DebugUtils.printDebug("Decoding Error: \(error.localizedDescription)")
+                completion(.failure(LLMError.decodingFailed))
+            }
+        }
+
+        // Start the network request
+        task.resume()
     }
 }
 
