@@ -92,11 +92,10 @@ We welcome contributions! If you're interested in helping develop swarm-swift, p
 
 ## License
 
-(Include license information)
+This project is licensed under the MIT License.
 
 ## Acknowledgements
 
 This project is based on the work done by OpenAI on their [Swarm framework](https://github.com/openai/swarm). We're grateful for their innovative approach to multi-agent AI systems.
 
-## Contact
 
