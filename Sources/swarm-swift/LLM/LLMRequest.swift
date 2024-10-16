@@ -85,6 +85,56 @@ public struct LLMRequest: Codable {
         case toolChoice = "tool_choice"
     }
 
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Decode all properties
+        model = try container.decode(String.self, forKey: .model)
+        messages = try container.decode([Message].self, forKey: .messages)
+        temperature = try container.decodeIfPresent(Double.self, forKey: .temperature)
+        topP = try container.decodeIfPresent(Double.self, forKey: .topP)
+        n = try container.decodeIfPresent(Int.self, forKey: .n)
+        stream = try container.decodeIfPresent(Bool.self, forKey: .stream)
+        stop = try container.decodeIfPresent([String].self, forKey: .stop)
+        maxTokens = try container.decodeIfPresent(Int.self, forKey: .maxTokens)
+        presencePenalty = try container.decodeIfPresent(Double.self, forKey: .presencePenalty)
+        frequencyPenalty = try container.decodeIfPresent(Double.self, forKey: .frequencyPenalty)
+        logitBias = try container.decodeIfPresent([String: Int].self, forKey: .logitBias)
+        user = try container.decodeIfPresent(String.self, forKey: .user)
+        voice = try container.decodeIfPresent(String.self, forKey: .voice)
+        responseFormat = try container.decodeIfPresent(String.self, forKey: .responseFormat)
+        speed = try container.decodeIfPresent(Double.self, forKey: .speed)
+        fileData = try container.decodeIfPresent(Data.self, forKey: .fileData)
+        fileName = try container.decodeIfPresent(String.self, forKey: .fileName)
+        language = try container.decodeIfPresent(String.self, forKey: .language)
+        tools = try container.decodeIfPresent([Tool].self, forKey: .tools)
+        toolChoice = try container.decodeIfPresent(String.self, forKey: .toolChoice)
+        
+        // Set default values after decoding
+        setDefaultValues()
+    }
+
+    private mutating func setDefaultValues() {
+        if maxTokens == nil {
+            maxTokens = LLMRequest.defaultMaxTokens
+        }
+        if temperature == nil {
+            temperature = LLMRequest.defaultTemperature
+        }
+        if topP == nil {
+            topP = LLMRequest.defaultTopP
+        }
+        if frequencyPenalty == nil {
+            frequencyPenalty = LLMRequest.defaultFrequencyPenalty
+        }
+        if presencePenalty == nil {
+            presencePenalty = LLMRequest.defaultPresencePenalty
+        }
+        if stop == nil {
+            stop = LLMRequest.defaultStop
+        }
+    }
+
     public init(
         model: String,
         messages: [Message],
@@ -127,6 +177,8 @@ public struct LLMRequest: Codable {
         self.language = language
         self.tools = tools
         self.toolChoice = toolChoice
+        
+        setDefaultValues()
     }
     
     public var description: String {
@@ -303,21 +355,21 @@ public struct LLMRequest: Codable {
         if let temperature = json["temperature"] as? Double {
             request.temperature = temperature
         }
+        
+        
         if let topP = json["top_p"] as? Double {
             request.topP = topP
         }
         if let n = json["n"] as? Int {
             request.n = n
         }
-        if let stream = json["stream"] as? Bool {
-            request.stream = stream
-        }
+        request.stream = (json["stream"] as? Bool) ?? false
+
         if let stop = json["stop"] as? [String] {
             request.stop = stop
         }
-        if let maxTokens = json["max_tokens"] as? Int {
-            request.maxTokens = maxTokens
-        }
+        request.maxTokens = (json["max_tokens"] as? Int) ?? defaultMaxTokens
+        
         if let presencePenalty = json["presence_penalty"] as? Double {
             request.presencePenalty = presencePenalty
         }
@@ -366,7 +418,7 @@ public struct LLMRequest: Codable {
                     let property = Property(
                         type: value["type"] as? String ?? "",
                         description: value["description"] as? String,
-                        `enum`: value["enum"] as? [String]  // 使用反引号来转义 Swift 关键字 "enum"
+                        `enum`: value["enum"] as? [String]  // use `` to escape the keyword "enum" in swift
                     )
                     return (key, property)
                 }

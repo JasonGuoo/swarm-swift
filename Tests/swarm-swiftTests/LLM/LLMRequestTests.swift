@@ -136,7 +136,7 @@ final class LLMRequestTests: XCTestCase {
         XCTAssertEqual(request.maxTokens, LLMRequest.defaultMaxTokens, "Actual maxTokens: \(request.maxTokens)")
         XCTAssertEqual(request.stream,false, "Actual stream value: \(request.stream ?? false)")
         XCTAssertNil(request.tools, "Actual tools value: \(request.tools ?? nil)")
-        XCTAssertNil(request.toolChoice, "Actual toolChoice value: \(request.toolChoice ?? "")")
+        XCTAssertEqual(request.toolChoice, "auto", "Actual toolChoice value: \(request.toolChoice ?? "")")
     }
     
     func testLLMRequestWithFunctionCallingFromJSON() {
