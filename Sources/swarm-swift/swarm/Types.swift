@@ -13,6 +13,27 @@ public struct ChatCompletionMessageToolCall: Codable {
     var function: LLMRequest.Function
 }
 
+/// Represents an agent in the swarm.
+/// Noted that since the swift language does not support dynamic method calling,
+/// the function name for dynamic calling is not the original name, but is constructed
+/// by joining the parameters with "WithArgs:"
+/// For example, a function get_current_weather(location, unit)
+/// would be dynamically called using the name "get_current_weatherWithArgs:"
+/// The function that will be called by the LLM should conform the conventions as:
+/// func functionName(args: [String: Any]) -> SwarmResult
+/// The args dictionary will contain all the parameters that are required by the function.
+/// Example of a subclass of the Agent class:
+/// class WeatherAgent: Agent {
+///     func get_current_weather(args: [String: Any]) -> SwarmResult {
+///         let location = args["location"] as? String ?? "Unknown"
+///         let unit = args["unit"] as? String ?? "fahrenheit"
+///         let result = "Current weather in \(location): 25°\(unit)"
+///         return SwarmResult(value: result)
+///     }
+/// }
+/// Then the LLM can call the function get_current_weather with the arguments:
+/// {"location": "New York", "unit": "C"}
+/// The function will return a SwarmResult with the value "Current weather in New York: 25°C"
 public class Agent: NSObject, Codable {
     var name: String
     var model: String
