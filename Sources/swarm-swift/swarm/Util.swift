@@ -67,24 +67,10 @@ func mergeChunk(finalResponse: inout [String: Any], delta: [String: Any]) {
 /// This function constructs the Objective-C style selector name by appending
 /// parameter names to the function name, separated by "With" and ":".
 ///
-/// Example:
-/// ```
-/// let name = generateDynamicFunctionName(functionName: "get_current_weather", 
-///                                        arguments: ["location": "New York", "unit": "C"])
-/// print(name) // Output: "get_current_weatherWithLocation:unit:"
-/// ```
-func generateDynamicFunctionName(functionName: String, arguments: [String: Any]) -> String {
+
+func generateDynamicFunctionName(functionName: String) -> String {
     let baseNameComponents = functionName.split(separator: "_")
     let baseName = baseNameComponents.joined(separator: "_")
-    
-    if arguments.isEmpty {
-        return baseName
-    }
-    
-    let parameterNames = arguments.keys.sorted()
-    let firstParam = parameterNames[0].capitalized
-    let restParams = parameterNames.dropFirst().map { $0 + ":" }.joined()
-    
     return "\(baseName)WithArgs:"
 }
 
@@ -103,7 +89,7 @@ func generateDynamicFunctionName(functionName: String, arguments: [String: Any])
 /// 3. The function name for dynamic calling is not the original name, but is constructed
 ///    by joining the parameters with "With".
 ///    For example, a function get_current_weather(location, unit)
-///    would be dynamically called using the name "get_current_weatherWithLocation:unit:"
+///    would be dynamically called using the name "get_current_weatherWithArgs:"
 func callFunction(on agent: Agent, with functionName: String, arguments: [String: Any]) throws -> Any {
     // 1. Find the corresponding LLMRequest.Tool
     guard let tool = agent.functions.first(where: { $0.function.name == functionName }) else {
@@ -118,7 +104,7 @@ func callFunction(on agent: Agent, with functionName: String, arguments: [String
     }
     
     // Generate the dynamic function name
-    let dynamicFunctionName = generateDynamicFunctionName(functionName: functionName, arguments: arguments)
+    let dynamicFunctionName = generateDynamicFunctionName(functionName: functionName)
     
     // Use the generated dynamic function name to create the selector
     let selector = NSSelectorFromString(dynamicFunctionName)
