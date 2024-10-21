@@ -20,7 +20,7 @@ public class ChatGLMClient: LLMClient {
     override func createCompletion(request: LLMRequest, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
         let chatRequest = LLMRequest(
             model: request.model,
-            messages: [LLMRequest.Message(role: "user", content: request.messages.last?.content ?? "")],
+            messages: [LLMMessage(role: "user", content: request.messages.last?.content ?? "")],
             temperature: request.temperature,
             maxTokens: request.maxTokens
         )

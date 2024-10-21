@@ -21,12 +21,16 @@ class ChatGLMClientTests: XCTestCase {
         let request = LLMRequest.create(
             model: ChatGLMClient.ModelType.glm4Flash.rawValue,  // 使用适合 ChatGLM 的模型名称
             messages: [
-                ["role":"system","content": "You are a helpful assistant."],
-                ["role":"user","content": "What is the capital of France?"]
+                LLMMessage(role: "system", content: "You are a helpful assistant.", additionalFields: [:]),
+                LLMMessage(role: "user", content: "What is the capital of France?",  additionalFields: [:])
             ],
             temperature: 0.7,
             maxTokens: 150,
-            additionalParameters: ["top_p": 1.0, "frequency_penalty": 0.0, "presence_penalty": 0.0]
+            additionalParameters: [
+                "top_p": AnyCodable(1.0),
+                "frequency_penalty": AnyCodable(0.0),
+                "presence_penalty": AnyCodable(0.0)
+            ]
         )
         
         client.createChatCompletion(request: request) { result in
@@ -44,7 +48,7 @@ class ChatGLMClientTests: XCTestCase {
                     XCTAssertEqual(firstChoice.index, 0, "First choice should have index 0")
                     XCTAssertEqual(firstChoice.message?.role, "assistant", "Message role should be assistant")
                     XCTAssertNotNil(firstChoice.message?.content, "Message should have content")
-                    XCTAssertTrue(firstChoice.message?.content?.contains("Paris") ?? false, "Content should mention Paris")
+                    XCTAssertTrue(firstChoice.message?.content.contains("Paris") ?? false, "Content should mention Paris")
                     XCTAssertEqual(firstChoice.finishReason, "stop", "Finish reason should be 'stop'")
                 }
                 

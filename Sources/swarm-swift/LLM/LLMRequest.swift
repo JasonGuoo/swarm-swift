@@ -455,12 +455,55 @@ public struct LLMRequest: Codable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        // ... encode existing properties ...
         
-        if let additionalParameters = additionalParameters {
-            let additionalData = try JSONSerialization.data(withJSONObject: additionalParameters)
-            try container.encode(additionalData, forKey: .additionalParameters)
+        try container.encode(model, forKey: .model)
+        try container.encode(messages, forKey: .messages)  // This should work as is if LLMMessage is Codable
+        try container.encodeIfPresent(temperature, forKey: .temperature)
+        try container.encodeIfPresent(topP, forKey: .topP)
+        try container.encodeIfPresent(n, forKey: .n)
+        try container.encodeIfPresent(stream, forKey: .stream)
+        try container.encodeIfPresent(stop, forKey: .stop)
+        try container.encodeIfPresent(maxTokens, forKey: .maxTokens)
+        try container.encodeIfPresent(presencePenalty, forKey: .presencePenalty)
+        try container.encodeIfPresent(frequencyPenalty, forKey: .frequencyPenalty)
+        try container.encodeIfPresent(logitBias, forKey: .logitBias)
+        try container.encodeIfPresent(user, forKey: .user)
+        try container.encodeIfPresent(voice, forKey: .voice)
+        try container.encodeIfPresent(responseFormat, forKey: .responseFormat)
+        try container.encodeIfPresent(speed, forKey: .speed)
+        try container.encodeIfPresent(fileData, forKey: .fileData)
+        try container.encodeIfPresent(fileName, forKey: .fileName)
+        try container.encodeIfPresent(language, forKey: .language)
+        
+        // Encode tools if present
+        if let tools = tools {
+            try container.encode(tools, forKey: .tools)
         }
+        
+        try container.encodeIfPresent(toolChoice, forKey: .toolChoice)
+        
+        // Encode additionalParameters if present
+        if let additionalParameters = additionalParameters {
+            var additionalContainer = container.nestedContainer(keyedBy: AnyCodingKey.self, forKey: .additionalParameters)
+            for (key, value) in additionalParameters {
+                try additionalContainer.encode(value, forKey: AnyCodingKey(stringValue: key))
+            }
+        }
+    }
+}
+
+// Helper type to allow for dynamic keys in coding/decoding
+private struct AnyCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+
+    init(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = "\(intValue)"
+        self.intValue = intValue
     }
 }
 
@@ -470,4 +513,3 @@ public enum LLMRequestError: Error {
     case invalidToolFormat
     case invalidJSONString
 }
-

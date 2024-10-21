@@ -10,9 +10,9 @@ import Foundation
 public struct LLMMessage: Codable {
     public var role: String
     public var content: String
-    public var additionalFields: [String: AnyCodable]
+    public var additionalFields: [String: AnyCodable]?
 
-    public init(role: String, content: String, additionalFields: [String: AnyCodable] = [:]) {
+    public init(role: String, content: String, additionalFields: [String: AnyCodable]? = nil) {
         self.role = role
         self.content = content
         self.additionalFields = additionalFields
@@ -23,7 +23,7 @@ public struct LLMMessage: Codable {
             "role": role,
             "content": content
         ]
-        additionalFields.forEach { key, value in
+        additionalFields?.forEach { key, value in
             dict[key] = value.value
         }
         return dict
@@ -36,7 +36,7 @@ public struct LLMMessage: Codable {
         case "content":
             return content
         default:
-            return additionalFields[key]?.value
+            return additionalFields?[key]?.value
         }
     }
 
@@ -45,7 +45,7 @@ public struct LLMMessage: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         role = try container.decode(String.self, forKey: .role)
         content = try container.decode(String.self, forKey: .content)
-        additionalFields = try container.decode([String: AnyCodable].self, forKey: .additionalFields)
+        additionalFields = try container.decodeIfPresent([String: AnyCodable].self, forKey: .additionalFields)
     }
 
     // Implement Encodable
@@ -53,7 +53,7 @@ public struct LLMMessage: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(role, forKey: .role)
         try container.encode(content, forKey: .content)
-        try container.encode(additionalFields, forKey: .additionalFields)
+        try container.encodeIfPresent(additionalFields, forKey: .additionalFields)
     }
 
     private enum CodingKeys: String, CodingKey {

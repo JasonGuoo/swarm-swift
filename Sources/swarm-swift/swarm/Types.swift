@@ -69,34 +69,32 @@ public class Agent: NSObject, Codable {
     }
 }
 
-@objc public class SwarmResult: NSObject, Codable {
-    @objc public var value: String
-    @objc public var agent: Agent?
-    @objc public var contextVariables: [String: String]?
+public class SwarmResult: Codable {
+    public var messages: [LLMMessage]?
+    public var agent: Agent?
+    public var contextVariables: [String: String]?
     
-    @objc public init(value: String, agent: Agent? = nil, contextVariables: [String: String]? = nil) {
-        self.value = value
+    public init(messages: [LLMMessage]? = nil, agent: Agent? = nil, contextVariables: [String: String]? = nil) {
+        self.messages = messages
         self.agent = agent
         self.contextVariables = contextVariables
-        super.init()
     }
     
     public required init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        value = try container.decode(String.self, forKey: .value)
+        messages = try container.decode([LLMMessage].self, forKey: .messages)
         agent = try container.decodeIfPresent(Agent.self, forKey: .agent)
         contextVariables = try container.decodeIfPresent([String: String].self, forKey: .contextVariables)
-        super.init()
     }
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(value, forKey: .value)
+        try container.encode(messages, forKey: .messages)
         try container.encodeIfPresent(agent, forKey: .agent)
         try container.encodeIfPresent(contextVariables, forKey: .contextVariables)
     }
     
     private enum CodingKeys: String, CodingKey {
-        case value, agent, contextVariables
+        case messages, agent, contextVariables
     }
 }

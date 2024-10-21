@@ -71,13 +71,13 @@ public class Swarm {
             functionMap[rtool.function.name] = rtool.function
         }
         
-        var partialResponse = SwarmResult(value: "")
+        var partialResponse = SwarmResult(messages: [])
 
         for toolCall in toolCalls {
             let name = toolCall.function?.name
             guard let function : LLMRequest.Function = functionMap[name ?? ""] else {
                 debugPrint(debug, "Tool \(name) not found in function map.")
-                partialResponse.value = "Error: Tool \(name) not found."
+                partialResponse.messages?.append(LLMMessage(role:"assistant", content: "Error: Tool \(name) not found."))
                 continue
             }
 
@@ -113,7 +113,7 @@ public class Swarm {
                 rawResult = try callFunction(on: agent, with: name ?? "", arguments: arrayOfDictionaries)
             } catch {
                 debugPrint(debug, "Error calling function \(name ?? ""): \(error)")
-                partialResponse.value = "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)"
+                partialResponse.messages?.append(LLMMessage(role:"assistant", content: "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)"))
                 continue
             }
             let result = handleFunctionResult(rawResult, debug: debug) 
@@ -131,7 +131,7 @@ public class Swarm {
         debug: Bool = false,
         maxTurns: Int = Int.max,
         executeTools: Bool = true
-    ) -> LLMResponse {
+    ) -> SwarmResult {
 
         
         // TODO: stream is not suppored yet
@@ -196,42 +196,41 @@ public class Swarm {
                 debug: debug
             )
 
-            history.append(LLMMessage(role: "tool", content: partialResponse.value))
+            if let messages = partialResponse.messages {
+                history.append(contentsOf: messages)
+            }
             
             if let newAgent = partialResponse.agent {
                 activeAgent = newAgent
             }
         }
 
-        return LLMResponse(
-    //            `messages: Array(history.dropFirst(initLen)),
-    //            agent: activeAgent,
-    //            contextVariables: contextVariables`
+        return SwarmResult(
+               messages: Array(history.dropFirst(initLen)),
+               agent: activeAgent,
+               contextVariables: contextVariables
         )
 
     }
     
     public func handleFunctionResult(_ result: Any, debug: Bool) -> SwarmResult {
-//        switch result {
-//        case let result as SwarmResult:
-//            return result
-//        case let agent as Agent:
-//            return SwarmResult(
-//                value: try! JSONEncoder().encode(["assistant": agent.name]),
-//                agent: agent
-//            )
-//        default:
-//            do {
-//                return SwarmResult(value: String(describing: result))
-//            } catch {
-//                let errorMessage = "Failed to cast response to string: \(result). Make sure agent functions return a string or Result object. Error: \(error)"
-//                debugPrint(debug, errorMessage)
-//                fatalError(errorMessage)
-//            }
-//        }
-        
-        // TODO: Implement the function logic later
-        return SwarmResult(value: "", agent: nil, contextVariables: nil)
+       switch result {
+       case let result as SwarmResult:
+           return result
+       case let agent as Agent:
+           return SwarmResult(
+               messages: [LLMMessage(role: "assistant", content: try!  agent.name)],
+               agent: agent
+           )
+       default:
+           do {
+               return SwarmResult(messages: [LLMMessage(role: "assistant", content: String(describing: result))])
+           } catch {
+               let errorMessage = "Failed to cast response to string: \(result). Make sure agent functions return a string or Result object. Error: \(error)"
+               debugPrint(debug, errorMessage)
+               fatalError(errorMessage)
+           }
+       }
     }
 
 }

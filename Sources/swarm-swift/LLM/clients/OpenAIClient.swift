@@ -43,7 +43,7 @@ public class OpenAIClient: LLMClient {
             completion(.failure(LLMError.invalidURL))
             return
         }
-
+        
         DebugUtils.printDebug("Request URL: \(url.absoluteString)")
 
         // Set up the URLRequest with necessary headers
