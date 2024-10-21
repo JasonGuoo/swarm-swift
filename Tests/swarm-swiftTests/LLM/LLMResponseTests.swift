@@ -61,4 +61,35 @@ class LLMResponseTests: XCTestCase {
             XCTFail("Failed to create LLMResponse from JSON: \(error)")
         }
     }
+
+    func testLLMResponseFromJSONWithToolCalls() {
+        let jsonString = """
+        {"choices":[{"finish_reason":"tool_calls","index":0,"message":{"role":"assistant","tool_calls":[{"function":{"arguments":"{\\\"location\\\": \\\"Boston, MA\\\", \\\"unit\\\": \\\"fahrenheit\\\"}","name":"get_current_weather"},"id":"call_9131157062184528331","index":0,"type":"function"}]}}],"created":1729512661,"id":"2024102120110097adab97583348f1","model":"glm-4-flash","request_id":"2024102120110097adab97583348f1","usage":{"completion_tokens":20,"prompt_tokens":207,"total_tokens":227}}
+        """
+        
+        let result = LLMResponse.fromJSON(jsonString)
+        
+        switch result {
+        case .success(let response):
+            XCTAssertEqual(response.id, "2024102120110097adab97583348f1")
+            XCTAssertEqual(response.created, 1729512661)
+            XCTAssertEqual(response.model, "glm-4-flash")
+
+            
+            XCTAssertEqual(response.choices?.count, 1)
+            XCTAssertEqual(response.choices?[0].index, 0)
+            XCTAssertEqual(response.choices?[0].finishReason, "tool_calls")
+            
+            let message = response.choices?[0].message
+            XCTAssertEqual(message?.role, "assistant")
+            XCTAssertEqual(message?.content, "")
+            
+            XCTAssertEqual(response.usage?.promptTokens, 207)
+            XCTAssertEqual(response.usage?.completionTokens, 20)
+            XCTAssertEqual(response.usage?.totalTokens, 227)
+            
+        case .failure(let error):
+            XCTFail("Failed to create LLMResponse from JSON: \(error)")
+        }
+    }
 }

@@ -108,6 +108,7 @@ class ChatGLMClientTests: XCTestCase {
         let request: LLMRequest
         do {
             request = try LLMRequest.fromJSONString(jsonstring)
+            DebugUtils.printDebug(request.description)
         } catch {
             XCTFail("Failed to create LLMRequest: \(error)")
             return

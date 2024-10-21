@@ -9,7 +9,7 @@ import Foundation
 
 public struct LLMMessage: Codable {
     public var role: String
-    public var content: String
+    public var content: String = ""
     public var additionalFields: [String: AnyCodable]?
 
     public init(role: String, content: String, additionalFields: [String: AnyCodable]? = nil) {
@@ -44,7 +44,11 @@ public struct LLMMessage: Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         role = try container.decode(String.self, forKey: .role)
-        content = try container.decode(String.self, forKey: .content)
+        do {
+            content = try container.decode(String.self, forKey: .content)
+        } catch {
+                content = ""
+        }
         additionalFields = try container.decodeIfPresent([String: AnyCodable].self, forKey: .additionalFields)
     }
 
