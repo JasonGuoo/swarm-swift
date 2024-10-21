@@ -9,7 +9,7 @@ public struct LLMRequest: Codable {
     public static let defaultStop: [String] = []
 
     public var model: String
-    public var messages: [Message]
+    public var messages: [LLMMessage]
     public var temperature: Double?
     public var topP: Double?
     public var n: Int?
@@ -28,16 +28,7 @@ public struct LLMRequest: Codable {
     public var language: String?
     public var tools: [Tool]?
     public var toolChoice: String?
-
-    public struct Message: Codable {
-        public var role: String
-        public var content: String
-
-        public init(role: String, content: String) {
-            self.role = role
-            self.content = content
-        }
-    }
+    public var additionalParameters: [String: AnyCodable]?
 
     public struct Tool: Codable {
         public var type: String
@@ -83,6 +74,7 @@ public struct LLMRequest: Codable {
         case language
         case tools
         case toolChoice = "tool_choice"
+        case additionalParameters
     }
 
     public init(from decoder: Decoder) throws {
@@ -90,7 +82,7 @@ public struct LLMRequest: Codable {
         
         // Decode all properties
         model = try container.decode(String.self, forKey: .model)
-        messages = try container.decode([Message].self, forKey: .messages)
+        messages = try container.decode([LLMMessage].self, forKey: .messages)
         temperature = try container.decodeIfPresent(Double.self, forKey: .temperature)
         topP = try container.decodeIfPresent(Double.self, forKey: .topP)
         n = try container.decodeIfPresent(Int.self, forKey: .n)
@@ -109,6 +101,9 @@ public struct LLMRequest: Codable {
         language = try container.decodeIfPresent(String.self, forKey: .language)
         tools = try container.decodeIfPresent([Tool].self, forKey: .tools)
         toolChoice = try container.decodeIfPresent(String.self, forKey: .toolChoice)
+        if let additionalData = try container.decodeIfPresent(Data.self, forKey: .additionalParameters) {
+            additionalParameters = try JSONSerialization.jsonObject(with: additionalData) as? [String: AnyCodable]
+        }
         
         // Set default values after decoding
         setDefaultValues()
@@ -137,7 +132,7 @@ public struct LLMRequest: Codable {
 
     public init(
         model: String,
-        messages: [Message],
+        messages: [LLMMessage],
         temperature: Double? = nil,
         topP: Double? = nil,
         n: Int? = nil,
@@ -155,7 +150,8 @@ public struct LLMRequest: Codable {
         fileName: String? = nil,
         language: String? = nil,
         tools: [Tool]? = nil,
-        toolChoice: String? = nil
+        toolChoice: String? = nil,
+        additionalParameters: [String: AnyCodable]? = nil
     ) {
         self.model = model
         self.messages = messages
@@ -177,6 +173,7 @@ public struct LLMRequest: Codable {
         self.language = language
         self.tools = tools
         self.toolChoice = toolChoice
+        self.additionalParameters = additionalParameters
         
         setDefaultValues()
     }
@@ -237,8 +234,8 @@ public struct LLMRequest: Codable {
     ///
     /// - Parameters:
     ///   - model: The name of the model to use for the request.
-    ///   - messages: An array of Message structs representing the conversation history.
-    ///               Each Message should have a role (e.g., "system", "user", "assistant") and content.
+    ///   - messages: An array of LLMMessage structs representing the conversation history.
+    ///               Each LLMMessage should have a role (e.g., "system", "user", "assistant") and content.
     ///   - temperature: Controls randomness in the model's output. Default is LLMRequest.defaultTemperature.
     ///   - maxTokens: The maximum number of tokens to generate. Default is nil.
     ///   - stream: Whether to stream the response. Default is nil.
@@ -261,17 +258,17 @@ public struct LLMRequest: Codable {
     ///   ```
     public static func create(
         model: String,
-        messages: [[String: String]],
+        messages: [LLMMessage],
         tools: [Tool]? = nil,
         toolChoice: String? = nil,
         temperature: Double? = LLMRequest.defaultTemperature,
         maxTokens: Int? = defaultMaxTokens,
         stream: Bool? = false,
-        additionalParameters: [String: Any]? = [:]
+        additionalParameters: [String: AnyCodable]? = [:]
     ) -> LLMRequest {
         var request = LLMRequest(
             model: model,
-            messages: messages.map { LLMRequest.Message(role: $0["role"]!, content: $0["content"]!) },
+            messages: messages,
             temperature: temperature,
             stream: stream,
             maxTokens: maxTokens,
@@ -285,19 +282,19 @@ public struct LLMRequest: Codable {
             for key in keys {
                 let value = additionalParams[key]
                 switch key {
-                case "topP": request.topP = value as? Double
-                case "n": request.n = value as? Int
-                case "stop": request.stop = value as? [String]
-                case "presencePenalty": request.presencePenalty = value as? Double
-                case "frequencyPenalty": request.frequencyPenalty = value as? Double
-                case "logitBias": request.logitBias = value as? [String: Int]
-                case "user": request.user = value as? String
-                case "voice": request.voice = value as? String
-                case "responseFormat": request.responseFormat = value as? String
-                case "speed": request.speed = value as? Double
-                case "fileData": request.fileData = value as? Data
-                case "fileName": request.fileName = value as? String
-                case "language": request.language = value as? String
+                case "topP": request.topP = value?.value as? Double
+                case "n": request.n = value?.value as? Int
+                case "stop": request.stop = value?.value as? [String]
+                case "presencePenalty": request.presencePenalty = value?.value as? Double
+                case "frequencyPenalty": request.frequencyPenalty = value?.value as? Double
+                case "logitBias": request.logitBias = value?.value as? [String: Int]
+                case "user": request.user = value?.value as? String
+                case "voice": request.voice = value?.value as? String
+                case "responseFormat": request.responseFormat = value?.value as? String
+                case "speed": request.speed = value?.value as? Double
+                case "fileData": request.fileData = value?.value as? Data
+                case "fileName": request.fileName = value?.value as? String
+                case "language": request.language = value?.value as? String
                 default: break
            }
             }
@@ -343,11 +340,11 @@ public struct LLMRequest: Codable {
             throw LLMRequestError.missingRequiredField("messages")
         }
         
-        let messages = messagesArray.compactMap { dict -> Message? in
+        let messages = messagesArray.compactMap { dict -> LLMMessage? in
             guard let role = dict["role"], let content = dict["content"] else {
                 return nil
             }
-            return Message(role: role, content: content)
+            return LLMMessage(role: role, content: content)
         }
         
         var request = LLMRequest(model: model, messages: messages)
@@ -455,6 +452,16 @@ public struct LLMRequest: Codable {
             throw LLMRequestError.invalidJSONString
         }
     }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        // ... encode existing properties ...
+        
+        if let additionalParameters = additionalParameters {
+            let additionalData = try JSONSerialization.data(withJSONObject: additionalParameters)
+            try container.encode(additionalData, forKey: .additionalParameters)
+        }
+    }
 }
 
 public enum LLMRequestError: Error {
@@ -463,3 +470,4 @@ public enum LLMRequestError: Error {
     case invalidToolFormat
     case invalidJSONString
 }
+

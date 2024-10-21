@@ -12,7 +12,7 @@ public struct LLMResponse: Codable {
 
     public struct Choice: Codable {
         public var index: Int?
-        public var message: Message?
+        public var message: LLMMessage?
         public var finishReason: String?
 
         enum CodingKeys: String, CodingKey {
@@ -20,12 +20,6 @@ public struct LLMResponse: Codable {
             case message
             case finishReason = "finish_reason"
         }
-    }
-
-    public struct Message: Codable {
-        public var role: String?
-        public var content: String?
-        public var toolCalls: [ToolCall]?
     }
 
     public struct ToolCall: Codable {
@@ -69,21 +63,8 @@ public struct LLMResponse: Codable {
             for choice in choices {
                 if let index = choice.index { desc += "    Index: \(index)\n" }
                 if let message = choice.message {
-                    desc += "    Message: Role: \(message.role ?? "")"
-                    if let content = message.content {
-                        desc += ", Content: \(content)"
-                    }
-                    desc += "\n"
-                    if let toolCalls = message.toolCalls {
-                        desc += "    Tool Calls:\n"
-                        for toolCall in toolCalls {
-                            if let id = toolCall.id { desc += "      ID: \(id)\n" }
-                            if let type = toolCall.type { desc += "      Type: \(type)\n" }
-                            if let function = toolCall.function {
-                                if let name = function.name { desc += "      Function: \(name)\n" }
-                                if let arguments = function.arguments { desc += "      Arguments: \(arguments)\n" }
-                            }
-                        }
+                    if let dict = try? message.toDictionary() {
+                        desc += "    Message: \(dict)\n"
                     }
                 }
                 if let finishReason = choice.finishReason {

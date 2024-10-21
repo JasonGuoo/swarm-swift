@@ -1,18 +1,5 @@
 import Foundation
 
-public struct ChatCompletionMessage: Codable {
-    var role: String
-    var content: String?
-    var name: String?
-    var functionCall: ChatCompletionMessageToolCall?
-}
-
-public struct ChatCompletionMessageToolCall: Codable {
-    var id: String
-    var type: String
-    var function: LLMRequest.Function
-}
-
 /// Represents an agent in the swarm.
 /// Noted that since the swift language does not support dynamic method calling,
 /// the function name for dynamic calling is not the original name, but is constructed
@@ -66,7 +53,7 @@ public class Agent: NSObject, Codable {
         name = try container.decode(String.self, forKey: .name)
         model = try container.decode(String.self, forKey: .model)
         instructions = try container.decodeIfPresent(String.self, forKey: .instructions)
-        functions = try container.decode([LLMRequest.Tool].self, forKey: .functions) // Changed from [String] to [LLMRequest.Tool]
+        functions = try container.decode([LLMRequest.Tool].self, forKey: .functions)
         toolChoice = try container.decodeIfPresent(String.self, forKey: .toolChoice)
         parallelToolCalls = try container.decode(Bool.self, forKey: .parallelToolCalls)
     }
@@ -80,12 +67,6 @@ public class Agent: NSObject, Codable {
         try container.encodeIfPresent(toolChoice, forKey: .toolChoice)
         try container.encode(parallelToolCalls, forKey: .parallelToolCalls)
     }
-}
-
-public struct ChatCompletionResponse: Codable {
-    var messages: [LLMRequest.Message]
-    var agent: Agent?
-    var contextVariables: [String: String]
 }
 
 @objc public class SwarmResult: NSObject, Codable {
