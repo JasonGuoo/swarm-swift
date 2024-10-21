@@ -24,8 +24,11 @@ public class Swarm {
 
         let model = modelOverride != nil ? modelOverride! : agent.model
         
+        var toolChoice = ""
         var tools = agent.functions
-        let toolChoice = tools.isEmpty ? "" : "auto"
+        if let tools = tools {
+            toolChoice = tools.isEmpty ? "" : "auto"
+        }
         // create new messages with instructions
         let newMessage = LLMMessage(role: "system", content: instructions )
         var newmessages = [newMessage]
@@ -110,7 +113,7 @@ public class Swarm {
 
             let rawResult: Any
             do {
-                rawResult = try callFunction(on: agent, with: name ?? "", arguments: arrayOfDictionaries)
+                rawResult = try callFunction(agent: agent, functionName: name ?? "", arguments: arrayOfDictionaries)
             } catch {
                 debugPrint(debug, "Error calling function \(name ?? ""): \(error)")
                 partialResponse.messages?.append(LLMMessage(role:"assistant", content: "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)"))
@@ -191,7 +194,7 @@ public class Swarm {
             let partialResponse = handleToolCalls(
                 agent: activeAgent,
                 toolCalls: message.getValue("tool_calls") as! [LLMResponse.ToolCall] ,
-                functions: activeAgent.functions,
+                functions: activeAgent.functions ?? [],
                 contextVariables: contextVariables,
                 debug: debug
             )

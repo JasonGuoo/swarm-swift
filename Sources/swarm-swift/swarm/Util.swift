@@ -90,9 +90,10 @@ func generateDynamicFunctionName(functionName: String) -> String {
 ///    by joining the parameters with "With".
 ///    For example, a function get_current_weather(location, unit)
 ///    would be dynamically called using the name "get_current_weatherWithArgs:"
-func callFunction(on agent: Agent, with functionName: String, arguments: [String: Any]) throws -> Any {
+func callFunction(agent: Agent, functionName: String, arguments: [String: Any]) throws -> Any {
     // 1. Find the corresponding LLMRequest.Tool
-    guard let tool = agent.functions.first(where: { $0.function.name == functionName }) else {
+    guard let functions = agent.functions,
+          let tool = functions.first(where: { $0.function.name == functionName }) else {
         throw FunctionCallError.functionNotFound(functionName)
     }
     
@@ -149,5 +150,6 @@ enum FunctionCallError: Error {
     /// Indicates that the function returned an unexpected type.
     case unexpectedReturnType(String, String)
 }
+
 
 

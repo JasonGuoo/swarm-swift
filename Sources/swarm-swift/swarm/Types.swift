@@ -25,16 +25,16 @@ public class Agent: NSObject, Codable {
     var name: String
     var model: String
     var instructions: String?
-    var functions: [LLMRequest.Tool] 
+    var functions: [LLMRequest.Tool]? // Changed to optional
     var toolChoice: String? 
-    var parallelToolCalls: Bool
+    var parallelToolCalls: Bool? = true
     
     init(name: String = "Agent",
          model: String = "gpt-4o",
          instructions: @escaping (() -> String) = { "You are a helpful agent." },
-         functions: [LLMRequest.Tool] = [], 
+         functions: [LLMRequest.Tool]? = nil, // Changed to optional with default value nil
          toolChoice: String? = "auto",
-         parallelToolCalls: Bool = true) {
+         parallelToolCalls: Bool? = true) {
         self.name = name
         self.model = model
         self.instructions = instructions()
@@ -53,9 +53,9 @@ public class Agent: NSObject, Codable {
         name = try container.decode(String.self, forKey: .name)
         model = try container.decode(String.self, forKey: .model)
         instructions = try container.decodeIfPresent(String.self, forKey: .instructions)
-        functions = try container.decode([LLMRequest.Tool].self, forKey: .functions)
+        functions = try container.decodeIfPresent([LLMRequest.Tool].self, forKey: .functions) // Changed to decodeIfPresent
         toolChoice = try container.decodeIfPresent(String.self, forKey: .toolChoice)
-        parallelToolCalls = try container.decode(Bool.self, forKey: .parallelToolCalls)
+        parallelToolCalls = try container.decodeIfPresent(Bool.self, forKey: .parallelToolCalls) ?? true
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -63,7 +63,7 @@ public class Agent: NSObject, Codable {
         try container.encode(name, forKey: .name)
         try container.encode(model, forKey: .model)
         try container.encodeIfPresent(instructions, forKey: .instructions)
-        try container.encode(functions, forKey: .functions)
+        try container.encodeIfPresent(functions, forKey: .functions) // Changed to encodeIfPresent
         try container.encodeIfPresent(toolChoice, forKey: .toolChoice)
         try container.encode(parallelToolCalls, forKey: .parallelToolCalls)
     }
