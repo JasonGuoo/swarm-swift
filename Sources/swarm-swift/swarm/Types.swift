@@ -9,18 +9,6 @@ import Foundation
 /// The function that will be called by the LLM should conform the conventions as:
 /// func functionName(args: [String: Any]) -> SwarmResult
 /// The args dictionary will contain all the parameters that are required by the function.
-/// Example of a subclass of the Agent class:
-/// class WeatherAgent: Agent {
-///     func get_current_weather(args: [String: Any]) -> SwarmResult {
-///         let location = args["location"] as? String ?? "Unknown"
-///         let unit = args["unit"] as? String ?? "fahrenheit"
-///         let result = "Current weather in \(location): 25°\(unit)"
-///         return SwarmResult(value: result)
-///     }
-/// }
-/// Then the LLM can call the function get_current_weather with the arguments:
-/// {"location": "New York", "unit": "C"}
-/// The function will return a SwarmResult with the value "Current weather in New York: 25°C"
 public class Agent: NSObject, Codable {
     var name: String
     var model: String
@@ -98,3 +86,118 @@ public class SwarmResult: Codable {
         case messages, agent, contextVariables
     }
 }
+
+// MARK: - How to Implement a Custom Agent
+
+/**
+ How to Implement a Custom Agent
+ 
+ To create your own custom agent, follow these steps:
+ 
+ 1. Create a new class that inherits from Agent:
+    ```
+    class MyCustomAgent: Agent {
+        // Custom properties and methods
+    }
+    ```
+ 
+ 2. Override the initializer:
+    ```
+    override init(name: String = "MyCustomAgent",
+                  model: String = "gpt-4",
+                  instructions: @escaping (() -> String) = { "You are a helpful custom agent." },
+                  functions: [LLMRequest.Tool]? = nil,
+                  toolChoice: String? = "auto",
+                  parallelToolCalls: Bool? = true) {
+        // Custom initialization
+        super.init(name: name,
+                   model: model,
+                   instructions: instructions,
+                   functions: functions ?? [/* Your custom functions */],
+                   toolChoice: toolChoice,
+                   parallelToolCalls: parallelToolCalls)
+    }
+    ```
+ 
+ 3. Implement the required initializer for Codable conformance:
+    ```
+    required init(from decoder: Decoder) throws {
+        try super.init(from: decoder)
+    }
+    ```
+ 
+ 4. Define your custom functions:
+    - Use the @objc attribute to make the function visible to Objective-C runtime
+    - Name your function with the "WithArgs" suffix
+    - Accept a single [String: Any] parameter
+    - Return Data (encoded SwarmResult)
+    - Parse the arguments inside the function
+    
+    Example:
+    ```
+    @objc func myCustomFunctionWithArgs(_ args: [String: Any]) -> Data {
+        // Parse args
+        let param1 = args["param1"] as? String ?? "default"
+        let param2 = args["param2"] as? Int ?? 0
+        
+        // Perform your custom logic
+        let result = "Processed: \(param1), \(param2)"
+        
+        // Create and encode SwarmResult
+        let swarmResult = SwarmResult(messages: [LLMMessage(role: "function", content: result)])
+        return try! JSONEncoder().encode(swarmResult)
+    }
+    ```
+    
+    Note: Swift doesn't support dynamic method calling like Python. We use the Objective-C runtime
+    to achieve similar functionality. This requires us to:
+    a) Use the @objc attribute to make the function visible to Objective-C.
+    b) Follow a specific naming convention (adding "WithArgs" suffix).
+    c) Accept all arguments in a single [String: Any] dictionary and parse them inside the function.
+    d) Encode the SwarmResult as Data, which will be decoded later in the callFunction method.
+    
+    This approach allows us to call methods dynamically while still using Swift's type system
+    and keeping the SwarmResult structure intact through the Objective-C boundary.
+ 
+ 5. Define the function description in the initializer:
+    ```
+    let myCustomFunction = LLMRequest.Tool(type: "function", function: LLMRequest.Function(
+        name: "my_custom_function",
+        description: "Description of what your function does",
+        parameters: LLMRequest.Parameters(
+            type: "object",
+            properties: [
+                "param1": LLMRequest.Property(type: "string", description: "Description of param1"),
+                "param2": LLMRequest.Property(type: "number", description: "Description of param2")
+            ],
+            required: ["param1", "param2"]
+        )
+    ))
+    ```
+    
+    Important: The 'name' field in the LLMRequest.Function should match the base name of your
+    function (without the "WithArgs" suffix). This name is used to find the correct function
+    to call, and the "WithArgs" suffix is added programmatically when needed.
+ 
+ 6. Add the function to the `functions` array in the initializer:
+    ```
+    super.init(name: name,
+               model: model,
+               instructions: instructions,
+               functions: functions ?? [myCustomFunction],
+               toolChoice: toolChoice,
+               parallelToolCalls: parallelToolCalls)
+    ```
+ 
+ By following these steps, you can create a custom agent that can be used with the Swarm framework.
+ The custom functions you define will be callable using the `callFunction` method in `Util.swift`.
+ 
+ Remember:
+ - Your function must accept all arguments in a single [String: Any] dictionary.
+ - You need to parse and validate the arguments inside your function.
+ - Handle errors appropriately in your function implementation.
+ - Ensure that your function's implementation matches the description and parameters you provide
+   in the function definition.
+ - The encoding and decoding of SwarmResult is handled automatically by the framework, but be
+   aware that this process is happening behind the scenes.
+ */

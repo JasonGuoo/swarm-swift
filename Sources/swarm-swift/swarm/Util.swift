@@ -61,7 +61,6 @@ func mergeChunk(finalResponse: inout [String: Any], delta: [String: Any]) {
 ///
 /// - Parameters:
 ///   - functionName: The original function name.
-///   - arguments: A dictionary of arguments to the function.
 /// - Returns: The generated dynamic function name.
 ///
 /// This function constructs the Objective-C style selector name by appending
@@ -132,15 +131,20 @@ func callFunction(agent: Agent, functionName: String, arguments: [String: Any]) 
         throw FunctionCallError.functionCallFailed(functionName)
     }
     
-    if let swarmResult = result as? SwarmResult {
-        return swarmResult
+    if let jsonData = result as? Data {
+        do {
+            let swarmResult = try JSONDecoder().decode(SwarmResult.self, from: jsonData)
+            return swarmResult
+        } catch {
+            throw FunctionCallError.deserializationFailed(functionName, error)
+        }
     } else {
         throw FunctionCallError.unexpectedReturnType(functionName, String(describing: type(of: result)))
     }
 }
 
 /// Enum representing errors that can occur during function calls.
-enum FunctionCallError: Error {
+enum FunctionCallError: Error, Equatable {
     /// Indicates that the specified function was not found on the agent.
     case functionNotFound(String)
     /// Indicates that a required parameter is missing from the arguments.
@@ -149,7 +153,23 @@ enum FunctionCallError: Error {
     case functionCallFailed(String)
     /// Indicates that the function returned an unexpected type.
     case unexpectedReturnType(String, String)
+    /// Indicates that deserialization failed.
+    case deserializationFailed(String, Error)
+    
+    static func == (lhs: FunctionCallError, rhs: FunctionCallError) -> Bool {
+        switch (lhs, rhs) {
+        case (.functionNotFound(let a), .functionNotFound(let b)):
+            return a == b
+        case (.missingRequiredParameter(let a), .missingRequiredParameter(let b)):
+            return a == b
+        case (.functionCallFailed(let a), .functionCallFailed(let b)):
+            return a == b
+        case (.unexpectedReturnType(let a1, let a2), .unexpectedReturnType(let b1, let b2)):
+            return a1 == b1 && a2 == b2
+        case (.deserializationFailed(let a, _), .deserializationFailed(let b, _)):
+            return a == b
+        default:
+            return false
+        }
+    }
 }
-
-
-
