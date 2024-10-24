@@ -1,4 +1,5 @@
 import XCTest
+import SwiftyJSON
 @testable import swarm_swift
 
 class ChatGLMClientTests: XCTestCase {
@@ -18,44 +19,43 @@ class ChatGLMClientTests: XCTestCase {
     func testCreateChatCompletion() {
         let expectation = self.expectation(description: "Chat completion")
         
-        let request = LLMRequest.create(
-            model: ChatGLMClient.ModelType.glm4Flash.rawValue,  // 使用适合 ChatGLM 的模型名称
-            messages: [
-                LLMMessage(role: "system", content: "You are a helpful assistant.", additionalFields: [:]),
-                LLMMessage(role: "user", content: "What is the capital of France?",  additionalFields: [:])
-            ],
-            temperature: 0.7,
-            maxTokens: 150,
-            additionalParameters: [
-                "top_p": AnyCodable(1.0),
-                "frequency_penalty": AnyCodable(0.0),
-                "presence_penalty": AnyCodable(0.0)
-            ]
-        )
+        let request = Request()
+        request.withModel(model: ChatGLMClient.ModelType.glm4Flash.rawValue)
+        
+        let systemMessage = Message()
+        systemMessage.withRole(role: "system")
+        systemMessage.withContent(content: "You are a helpful assistant.")
+        request.appendMessage(message: systemMessage)
+        
+        let userMessage = Message()
+        userMessage.withRole(role: "user")
+        userMessage.withContent(content: "What is the capital of France?")
+        request.appendMessage(message: userMessage)
+        
+        request.withTemperature(0.7)
+        request.withMaxTokens(150)
         
         client.createChatCompletion(request: request) { result in
             switch result {
             case .success(let response):
                 print(" ======== Full response: =======")
-                print(response)
+                print(response.description)
                 print(" ======== End of response =======")
                 XCTAssertFalse(response.isEmpty, "Response should not be empty")
-                XCTAssertNotNil(response.id, "Response should have an ID")
-                XCTAssertNotNil(response.created, "Response should have a creation timestamp")
+                XCTAssertNotNil(response.getId(), "Response should have an ID")
+                XCTAssertNotNil(response.getCreated(), "Response should have a creation timestamp")
                 
-                XCTAssertFalse(response.choices?.isEmpty ?? true, "Choices should not be empty")
-                if let firstChoice = response.choices?.first {
-                    XCTAssertEqual(firstChoice.index, 0, "First choice should have index 0")
-                    XCTAssertEqual(firstChoice.message?.role, "assistant", "Message role should be assistant")
-                    XCTAssertNotNil(firstChoice.message?.content, "Message should have content")
-                    XCTAssertTrue(firstChoice.message?.content.contains("Paris") ?? false, "Content should mention Paris")
-                    XCTAssertEqual(firstChoice.finishReason, "stop", "Finish reason should be 'stop'")
+                XCTAssertGreaterThan(response.getChoicesCount(), 0, "Choices should not be empty")
+                if let firstChoice = response.getChoiceMessage(at: 0) {
+                    XCTAssertEqual(firstChoice["role"].stringValue, "assistant", "Message role should be assistant")
+                    XCTAssertNotNil(firstChoice["content"].string, "Message should have content")
+                    XCTAssertTrue(firstChoice["content"].stringValue.contains("Paris"), "Content should mention Paris")
                 }
                 
-                XCTAssertNotNil(response.usage, "Response should include usage information")
-                XCTAssertNotNil(response.usage?.promptTokens, "Usage should include prompt tokens")
-                XCTAssertNotNil(response.usage?.completionTokens, "Usage should include completion tokens")
-                XCTAssertNotNil(response.usage?.totalTokens, "Usage should include total tokens")
+                XCTAssertNotNil(response.getUsage(), "Response should include usage information")
+                XCTAssertNotNil(response.getUsagePromptTokens(), "Usage should include prompt tokens")
+                XCTAssertNotNil(response.getUsageCompletionTokens(), "Usage should include completion tokens")
+                XCTAssertNotNil(response.getUsageTotalTokens(), "Usage should include total tokens")
                 
             case .failure(let error):
                 XCTFail("Chat completion failed with error: \(error)")
@@ -69,7 +69,7 @@ class ChatGLMClientTests: XCTestCase {
     func testCreateChatCompletionWithFunctionCall() {
         let expectation = self.expectation(description: "Chat completion with function call")
         
-        let jsonstring:String = """
+        let jsonString = """
         {
           "model": "glm-4-flash",
           "messages": [
@@ -105,32 +105,38 @@ class ChatGLMClientTests: XCTestCase {
         }
         """
         
-        let request: LLMRequest
-        do {
-            request = try LLMRequest.fromJSONString(jsonstring)
-            DebugUtils.printDebug(request.description)
-        } catch {
-            XCTFail("Failed to create LLMRequest: \(error)")
-            return
-        }
+        let request = Request(parseJSON: jsonString)
         
         client.createChatCompletion(request: request) { result in
             switch result {
             case .success(let response):
                 XCTAssertFalse(response.isEmpty, "Response should not be empty")
-                XCTAssertNotNil(response.id, "Response should have an ID")
-                XCTAssertNotNil(response.created, "Response should have a creation timestamp")
+                XCTAssertNotNil(response.getId(), "Response should have an ID")
+                XCTAssertNotNil(response.getCreated(), "Response should have a creation timestamp")
                 
                 print("================Full LLM Response:=================")
                 print(response.description)
                 print("================End of LLM Response=================")
-                XCTAssertFalse(response.choices?.isEmpty ?? true, "Choices should not be empty")
-                if let firstChoice = response.choices?.first {
-                    XCTAssertEqual(firstChoice.index, 0, "First choice should have index 0")
-                    XCTAssertEqual(firstChoice.message?.role, "assistant", "Message role should be assistant")
+                
+                XCTAssertGreaterThan(response.getChoicesCount(), 0, "Choices should not be empty")
+                if let firstChoice = response.getChoiceMessage(at: 0) {
+                    XCTAssertEqual(firstChoice["role"].stringValue, "assistant", "Message role should be assistant")
+                    
+                    // Check for tool calls
+                    let toolCalls = firstChoice["tool_calls"].arrayValue
+                    XCTAssertFalse(toolCalls.isEmpty, "Tool calls should not be empty")
+                    
+                    if let firstToolCall = toolCalls.first {
+                        XCTAssertEqual(firstToolCall["function"]["name"].stringValue, "get_current_weather", "Function call name should be get_current_weather")
+                        XCTAssertNotNil(firstToolCall["function"]["arguments"].string, "Function call should have arguments")
+                        
+                        if let arguments = firstToolCall["function"]["arguments"].string {
+                            XCTAssertTrue(arguments.contains("Boston"), "Arguments should contain Boston")
+                        }
+                    }
                 }
                 
-                XCTAssertNotNil(response.usage, "Response should include usage information")
+                XCTAssertNotNil(response.getUsage(), "Response should include usage information")
                 
             case .failure(let error):
                 XCTFail("Chat completion with function call failed with error: \(error)")

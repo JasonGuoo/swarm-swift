@@ -17,37 +17,37 @@ public class LLMClient {
     }
 
     // Main method for creating chat completions
-    func createChatCompletion(request: LLMRequest, completion: @escaping (Swift.Result<LLMResponse, Error>) -> Void) {
+    func createChatCompletion(request: Request, completion: @escaping (Swift.Result<Response, Error>) -> Void) {
         fatalError("createChatCompletion method must be implemented in subclass")
     }
 
     // Optional: For creating text completions (if supported by the API)
-    func createCompletion(request: LLMRequest, completion: @escaping (Swift.Result<LLMResponse, Error>) -> Void) {
+    func createCompletion(request: Request, completion: @escaping (Swift.Result<Response, Error>) -> Void) {
         fatalError("createCompletion method must be implemented in subclass")
     }
 
     // Optional: For creating embeddings (if supported by the API)
-    func createEmbedding(request: LLMRequest, completion: @escaping (Swift.Result<LLMResponse, Error>) -> Void) {
+    func createEmbedding(request: Request, completion: @escaping (Swift.Result<Response, Error>) -> Void) {
         fatalError("createEmbedding method must be implemented in subclass")
     }
 
     // Optional: For creating images (if supported by the API)
-    func createImage(request: LLMRequest, completion: @escaping (Swift.Result<LLMResponse, Error>) -> Void) {
+    func createImage(request: Request, completion: @escaping (Swift.Result<Response, Error>) -> Void) {
         fatalError("createImage method must be implemented in subclass")
     }
 
     // Optional: For audio transcription (if supported by the API)
-    func createTranscription(request: LLMRequest, completion: @escaping (Swift.Result<LLMResponse, Error>) -> Void) {
+    func createTranscription(request: Request, completion: @escaping (Swift.Result<Response, Error>) -> Void) {
         fatalError("createTranscription method must be implemented in subclass")
     }
 
     // Optional: For audio translation (if supported by the API)
-    func createTranslation(request: LLMRequest, completion: @escaping (Swift.Result<LLMResponse, Error>) -> Void) {
+    func createTranslation(request: Request, completion: @escaping (Swift.Result<Response, Error>) -> Void) {
         fatalError("createTranslation method must be implemented in subclass")
     }
 
     // New createSpeech method
-    func createSpeech(request: LLMRequest, completion: @escaping (Swift.Result<Data, Error>) -> Void) {
+    func createSpeech(request: Request, completion: @escaping (Swift.Result<Data, Error>) -> Void) {
         fatalError("createSpeech method must be implemented in subclass")
     }
 }

@@ -19,17 +19,17 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        // No external dependencies
+        .package(url: "https://github.com/SwiftyJSON/SwiftyJSON.git", .exact("5.0.2")),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "swarm-swift",
-            dependencies: []),
+            dependencies: ["SwiftyJSON"]),
         .testTarget(
             name: "swarm-swiftTests",
-            dependencies: ["swarm-swift"],
+            dependencies: ["swarm-swift", "SwiftyJSON"],
             swiftSettings: [
                 .define("DEBUG", .when(configuration: .debug)),
                 .define("RELEASE", .when(configuration: .release))
