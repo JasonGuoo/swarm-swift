@@ -108,7 +108,7 @@ import SwiftyJSON
  print("Completion tokens: \(response.getUsageCompletionTokens() ?? 0)")
  ```
 */
-public class Response: MessageBase {
+public class Response: MessageBase, CustomStringConvertible {
     
     enum CodingKeys: String, CodingKey {
         case id

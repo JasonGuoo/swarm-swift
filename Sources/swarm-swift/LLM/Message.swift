@@ -8,7 +8,7 @@
 import Foundation
 import SwiftyJSON
 
-public class Message: MessageBase, Codable {
+public class Message: MessageBase, Codable, CustomStringConvertible {
     
     public override init() {
         super.init()
@@ -46,6 +46,15 @@ public class Message: MessageBase, Codable {
     public init(_ json: JSON) {
         super.init()
         self.json = json
+    }
+    
+    public var description: String {
+        let options: JSONSerialization.WritingOptions = [.prettyPrinted]
+        if let jsonData = try? JSONSerialization.data(withJSONObject: json.object, options: options),
+           let prettyPrintedString = String(data: jsonData, encoding: .utf8) {
+            return prettyPrintedString
+        }
+        return json.description // Fallback to default description if beautification fails
     }
 }
 

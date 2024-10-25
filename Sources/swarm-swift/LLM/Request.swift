@@ -100,7 +100,7 @@ import SwiftyJSON
     request.withTools(tools)
     request.withToolChoice(["type": "auto"])
 */
-public class Request: MessageBase {
+public class Request: MessageBase, CustomStringConvertible {
     
     public func withModel(model:String) {
         json["model"] = JSON(model)
@@ -283,6 +283,15 @@ public class Request: MessageBase {
             message.json = messageJSON
             return message
         }
+    }
+
+    public var description: String {
+        let options: JSONSerialization.WritingOptions = [.prettyPrinted]
+        if let jsonData = try? JSONSerialization.data(withJSONObject: json.object, options: options),
+           let prettyPrintedString = String(data: jsonData, encoding: .utf8) {
+            return prettyPrintedString
+        }
+        return json.description // Fallback to default description if beautification fails
     }
 }
 
