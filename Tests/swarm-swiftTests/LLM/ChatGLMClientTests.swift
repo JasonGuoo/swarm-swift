@@ -35,6 +35,8 @@ class ChatGLMClientTests: XCTestCase {
         request.withTemperature(0.7)
         request.withMaxTokens(150)
         
+        print("request: \(request.json.rawString())")
+        
         client.createChatCompletion(request: request) { result in
             switch result {
             case .success(let response):

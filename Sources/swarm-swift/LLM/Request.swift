@@ -124,12 +124,12 @@ public class Request: MessageBase {
         json[CodingKeys.maxTokens.rawValue].int = maxTokens
     }
     
-    public func withTemperature(_ temperature: Float) {
-        json[CodingKeys.temperature.rawValue].float = temperature
+    public func withTemperature(_ temperature: NSDecimalNumber) {
+        json[CodingKeys.temperature.rawValue] = JSON(temperature)
     }
     
-    public func withTopP(_ topP: Float) {
-        json[CodingKeys.topP.rawValue].float = topP
+    public func withTopP(_ topP: NSDecimalNumber) {
+        json[CodingKeys.topP.rawValue] = JSON(topP)
     }
     
     public func withN(_ n: Int) {
