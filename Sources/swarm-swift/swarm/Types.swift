@@ -121,14 +121,14 @@ public class SwarmResult: Codable {
  
  4. Define your custom functions:
     - Use the @objc attribute to make the function visible to Objective-C runtime
-    - Name your function with the "WithArgs" suffix
+    - Keep the function name as same as the function name in the function definition
     - Accept a single [String: Any] parameter
     - Return Data (encoded SwarmResult)
     - Parse the arguments inside the function
     
     Example:
     ```
-    @objc func myCustomFunctionWithArgs(_ args: [String: Any]) -> Data {
+    @objc func myCustomFunction(_ args: [String: Any]) -> Data {
         // Parse args
         let param1 = args["param1"] as? String ?? "default"
         let param2 = args["param2"] as? Int ?? 0

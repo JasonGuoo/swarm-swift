@@ -28,7 +28,8 @@ func debugPrint(debug: Bool, _ args: Any...) {
 func generateDynamicFunctionName(functionName: String) -> String {
     let baseNameComponents = functionName.split(separator: "_")
     let baseName = baseNameComponents.joined(separator: "_")
-    return "\(baseName)WithArgs:"
+//    return "\(baseName)WithArgs:"
+    return "\(baseName):"
 }
 
 /// Calls a function on an Agent object based on the provided function definition and arguments.
@@ -43,10 +44,7 @@ func generateDynamicFunctionName(functionName: String) -> String {
 /// This function demonstrates how to dynamically call a method on a Swift object:
 /// 1. The class must inherit from NSObject.
 /// 2. The method must be marked with @objc.
-/// 3. The function name for dynamic calling is not the original name, but is constructed
-///    by joining the parameters with "WithArgs:".
-///    For example, a function get_current_weather(location, unit)
-///    would be dynamically called using the name "get_current_weatherWithArgs:"
+
 func callFunction(agent: Agent, functionName: String, arguments: String) throws -> Any {
     // 1. Find the corresponding function in the agent's functions
     guard let functions = agent.functions,
@@ -75,11 +73,12 @@ func callFunction(agent: Agent, functionName: String, arguments: String) throws 
     defer { free(methods) }
     
     print("Callable functions for agent:")
-    while let method = methods?.pointee {
+    var methodPtr = methods
+    while let method = methodPtr?.pointee {
         let selector = method_getName(method)
         let methodName = NSStringFromSelector(selector)
         print("- \(methodName)")
-        methods?.pointee = methods!.successor().pointee
+        methodPtr = methodPtr?.successor()
     }
     
     guard agent.responds(to: selector) else {
