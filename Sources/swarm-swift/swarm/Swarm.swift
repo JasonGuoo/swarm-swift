@@ -189,8 +189,7 @@ public class Swarm {
 
     // You'll need to implement this function
     private func callFunction(agent: Agent, functionName: String, arguments: String) throws -> Any {
-        // Implementation depends on how you want to handle function calls
-        fatalError("callFunction not implemented")
+        return try! callFunction(agent: agent, functionName: functionName, arguments: arguments)
     }
 
     private func debugPrint(debug: Bool, _ items: Any...) {

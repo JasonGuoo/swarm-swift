@@ -100,6 +100,30 @@ func callFunction(agent: Agent, functionName: String, arguments: String) throws 
         throw FunctionCallError.unexpectedReturnType(functionName, String(describing: type(of: result)))
     }
 }
+    
+    func callFunctionDirectly(agent: Agent, functionName: String, arguments: String) throws -> Any {
+        let dynamicFuncName = generateDynamicFunctionName(functionName: functionName)
+        let selector = NSSelectorFromString(dynamicFuncName)
+        
+        guard agent.responds(to: selector) else {
+            throw FunctionCallError.functionNotFound(functionName)
+        }
+        
+        guard let result = agent.perform(selector, with: JSON(arguments).dictionaryObject)?.takeUnretainedValue() else {
+            throw FunctionCallError.functionCallFailed(functionName)
+        }
+        
+        if let jsonData = result as? Data {
+            do {
+                let swarmResult = try JSONDecoder().decode(SwarmResult.self, from: jsonData)
+                return swarmResult
+            } catch {
+                throw FunctionCallError.deserializationFailed(functionName, error)
+            }
+        } else {
+            throw FunctionCallError.unexpectedReturnType(functionName, String(describing: type(of: result)))
+        }
+    }
 
 /// Enum representing errors that can occur during function calls.
 enum FunctionCallError: Error, Equatable {

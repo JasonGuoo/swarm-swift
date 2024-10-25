@@ -160,6 +160,10 @@ public class SwarmResult: Codable {
         ]
     ])
     ```
+ This JSON description of functions is necessary because Swift lacks the reflection capabilities 
+ found in languages like Python. We can't automatically generate these descriptions for functions 
+ defined in the Agent. However, when we query the LLM to determine if function calls are needed, 
+ it requires detailed information about the available functions.
  
  6. Add the function to the `functions` array in the initializer:
     ```
@@ -183,3 +187,4 @@ public class SwarmResult: Codable {
  - The encoding and decoding of SwarmResult is handled automatically by the framework, but be
    aware that this process is happening behind the scenes.
  */
+

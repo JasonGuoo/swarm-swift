@@ -78,6 +78,12 @@ class WeatherAgent: Agent {
         let result = SwarmResult(messages: JSON([["role": "function", "content": "Sent!"]]))
         return try! JSONEncoder().encode(result)
     }
+    
+    @objc func get_info(_ args: [String: Any]) -> Data {
+        var result = JSON(args)
+        let returnData = SwarmResult(messages: JSON(["code": 200]))
+        return try! JSONEncoder().encode(returnData)
+    }
 }
 
 class WeatherAgentTest: XCTestCase {
@@ -179,5 +185,34 @@ class WeatherAgentTest: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
+    }
+    
+    func testGetInfo() {
+        do {
+            let incomArgs = ["key-1": "value-1", "key-2": "value-2"]
+            let callresult = try callFunctionDirectly(agent: weatherAgent, functionName: "get_info", arguments: JSON(incomArgs).rawString() ?? "")
+            if let sresult = callresult as? SwarmResult {
+                print(sresult.messages)
+                XCTAssertNotNil(sresult)
+            }
+        }catch FunctionCallError.functionNotFound("get_info") {
+            XCTFail("function get_info not found")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testRunSwarm() {
+        let config = TestUtils.loadConfig(for: "ChatGLM")
+        
+        guard let client = ClientFactory.getLLMClient(apiType: "ChatGLM", config: config) else {
+            XCTFail("Failed to create LLMClient for ChatGLM")
+            return
+        }
+        
+        let swarm = Swarm(client: client)
+        let message = Message(["role": "user", "content": "What is the weather in Paris?"])
+        let result = swarm.run(agent: weatherAgent, messages: message, contextVariables: [:])
+        XCTAssertNotNil(result)
     }
 }
