@@ -51,11 +51,11 @@ public class Agent: NSObject, Codable {
 }
 
 public class SwarmResult: Codable {
-    public var messages: JSON?
+    public var messages: [Message]?
     public var agent: Agent?
     public var contextVariables: [String: String]?
     
-    public init(messages: JSON? = nil, agent: Agent? = nil, contextVariables: [String: String]? = nil) {
+    public init(messages: [Message]? = nil, agent: Agent? = nil, contextVariables: [String: String]? = nil) {
         self.messages = messages
         self.agent = agent
         self.contextVariables = contextVariables
@@ -63,14 +63,14 @@ public class SwarmResult: Codable {
     
     public required init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        messages = try container.decodeIfPresent(JSON.self, forKey: .messages)
+        messages = try container.decodeIfPresent([MessageCodable].self, forKey: .messages)?.map { Message($0.json) }
         agent = try container.decodeIfPresent(Agent.self, forKey: .agent)
         contextVariables = try container.decodeIfPresent([String: String].self, forKey: .contextVariables)
     }
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(messages, forKey: .messages)
+        try container.encodeIfPresent(messages?.map { MessageCodable($0.json) }, forKey: .messages)
         try container.encodeIfPresent(agent, forKey: .agent)
         try container.encodeIfPresent(contextVariables, forKey: .contextVariables)
     }

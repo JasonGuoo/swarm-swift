@@ -416,4 +416,5 @@ public class Response: MessageBase {
     public func getToolCallFunctionArguments(at choiceIndex: Int, toolCallIndex: Int) -> String? {
         return getToolCallFunction(at: choiceIndex, toolCallIndex: toolCallIndex)?["arguments"].string
     }
+
 }

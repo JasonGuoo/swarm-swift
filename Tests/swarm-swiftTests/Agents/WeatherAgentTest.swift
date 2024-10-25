@@ -61,7 +61,7 @@ class WeatherAgent: Agent {
         let location = args["location"] as? String ?? "Unknown"
         let time = args["time"] as? String ?? "now"
         let weatherData = ["location": location, "temperature": "65", "time": time]
-        let result = SwarmResult(messages: JSON([["role": "function", "content": JSON(weatherData).rawString() ?? ""]]))
+        let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: JSON(weatherData).rawString() ?? "")])
         return try! JSONEncoder().encode(result)
     }
     
@@ -75,13 +75,13 @@ class WeatherAgent: Agent {
         print("Subject: \(subject)")
         print("Body: \(body)")
         
-        let result = SwarmResult(messages: JSON([["role": "function", "content": "Sent!"]]))
+        let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: "Sent!")])
         return try! JSONEncoder().encode(result)
     }
     
     @objc func get_info(_ args: [String: Any]) -> Data {
         var result = JSON(args)
-        let returnData = SwarmResult(messages: JSON(["code": 200]))
+        let returnData = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: result.rawString() ?? "")])
         return try! JSONEncoder().encode(returnData)
     }
 }
@@ -133,33 +133,33 @@ class WeatherAgentTest: XCTestCase {
             let getWeatherResult = try callFunction(agent: weatherAgent, functionName: "get_weather", arguments: JSON(getWeatherArgs).rawString() ?? "")
             
             if let swarmResult = getWeatherResult as? SwarmResult,
-               let message = swarmResult.messages?.arrayValue.first,
-               let content = message["content"].string {
-                let weatherData = try JSON(parseJSON: content)
+               let message = swarmResult.messages?.first {
+                let content = message.json["content"]
+                let weatherData = content
                 XCTAssertEqual(weatherData["location"].stringValue, "Paris")
                 XCTAssertEqual(weatherData["temperature"].stringValue, "65")
                 XCTAssertEqual(weatherData["time"].stringValue, "now")
             } else {
                 XCTFail("Unexpected result structure for get_weather")
             }
-        } catch {
-            XCTFail("Error calling get_weather function: \(error)")
-        }
-        
-        // Test send_email function
-        do {
-            let sendEmailArgs = ["recipient": "test@example.com", "subject": "Test Subject", "body": "Test Body"]
-            let sendEmailResult = try callFunction(agent: weatherAgent, functionName: "send_email", arguments: JSON(sendEmailArgs).rawString() ?? "")
             
-            if let swarmResult = sendEmailResult as? SwarmResult,
-               let message = swarmResult.messages?.arrayValue.first,
-               let content = message["content"].string {
-                XCTAssertEqual(content, "Sent!")
-            } else {
-                XCTFail("Unexpected result structure for send_email")
+            // Test send_email function
+            do {
+                let sendEmailArgs = ["recipient": "test@example.com", "subject": "Test Subject", "body": "Test Body"]
+                let sendEmailResult = try callFunction(agent: weatherAgent, functionName: "send_email", arguments: JSON(sendEmailArgs).rawString() ?? "")
+                
+                if let swarmResult = sendEmailResult as? SwarmResult,
+                   let message = swarmResult.messages?.first {
+                    let content = message.json["content"]
+                    XCTAssertEqual(content.stringValue, "Sent!")
+                } else {
+                    XCTFail("Unexpected result structure for send_email")
+                }
+            } catch {
+                XCTFail("Error calling send_email function: \(error)")
             }
         } catch {
-            XCTFail("Error calling send_email function: \(error)")
+            XCTFail("Error calling get_weather function: \(error)")
         }
     }
     
@@ -190,7 +190,7 @@ class WeatherAgentTest: XCTestCase {
     func testGetInfo() {
         do {
             let incomArgs = ["key-1": "value-1", "key-2": "value-2"]
-            let callresult = try callFunctionDirectly(agent: weatherAgent, functionName: "get_info", arguments: JSON(incomArgs).rawString() ?? "")
+            let callresult = try callFunction(agent: weatherAgent, functionName: "get_info", arguments: JSON(incomArgs).rawString() ?? "")
             if let sresult = callresult as? SwarmResult {
                 print(sresult.messages)
                 XCTAssertNotNil(sresult)
@@ -211,8 +211,8 @@ class WeatherAgentTest: XCTestCase {
         }
         
         let swarm = Swarm(client: client)
-        let message = Message(["role": "user", "content": "What is the weather in Paris?"])
-        let result = swarm.run(agent: weatherAgent, messages: message, contextVariables: [:])
+        let message = Message().withRole(role: "user").withContent(content: "What is the weather in Paris")
+        let result = swarm.run(agent: weatherAgent, messages: [message], contextVariables: [:])
         XCTAssertNotNil(result)
     }
 }

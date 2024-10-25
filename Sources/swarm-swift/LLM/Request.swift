@@ -120,6 +120,13 @@ public class Request: MessageBase {
         json[CodingKeys.messages.rawValue].arrayObject?.append(message.json.object)
     }
     
+    public func appendMessages(messages: [Message])
+    {
+        for message in messages {
+            appendMessage(message: message)
+        }
+    }
+    
     public func withMaxTokens(_ maxTokens: Int) {
         json[CodingKeys.maxTokens.rawValue].int = maxTokens
     }
@@ -266,8 +273,18 @@ public class Request: MessageBase {
         case additionalParameters
     }
 
+    public func getMessages() -> [Message] {
+        guard let messagesArray = json[CodingKeys.messages.rawValue].array else {
+            return []
+        }
+        
+        return messagesArray.map { messageJSON in
+            let message = Message()
+            message.json = messageJSON
+            return message
+        }
+    }
 }
-
 
 public enum LLMRequestError: Error {
     case invalidJSONFormat

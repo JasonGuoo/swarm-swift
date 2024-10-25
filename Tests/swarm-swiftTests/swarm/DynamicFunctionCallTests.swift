@@ -9,7 +9,7 @@ class DynamicFunctionCallTests: XCTestCase {
             let location = args["location"] as? String ?? "Unknown"
             let unit = args["unit"] as? String ?? "fahrenheit"
             let returnvalue = "Current weather in \(location): 25°\(unit)"
-            let result = SwarmResult(messages: JSON([["role": "function", "content": returnvalue]]))
+            let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: returnvalue)])
             return try! JSONEncoder().encode(result)
         }
         
@@ -52,11 +52,11 @@ class DynamicFunctionCallTests: XCTestCase {
         @objc func addWithArgs(_ args: [String: Any]) -> Data {
             guard let a = args["a"] as? Double,
                   let b = args["b"] as? Double else {
-                let result = SwarmResult(messages: JSON([["role": "function", "content": "Error: Invalid arguments"]]))
+                let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: "Error: Invalid arguments")])
                 return try! JSONEncoder().encode(result)
             }
             let returnvalue = a + b
-            let result = SwarmResult(messages: JSON([["role": "function", "content": "\(returnvalue)"]]))
+            let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: "\(returnvalue)")])
             return try! JSONEncoder().encode(result)
         }
         
@@ -101,7 +101,7 @@ class DynamicFunctionCallTests: XCTestCase {
         
         XCTAssertTrue(result is SwarmResult)
         if let swarmResult = result as? SwarmResult {
-            XCTAssertEqual(swarmResult.messages?.arrayValue.first?["content"].stringValue, "Current weather in New York: 25°celsius")
+            XCTAssertEqual(swarmResult.messages?.first?.content(), "Current weather in New York: 25°celsius")
         } else {
             XCTFail("Expected SwarmResult")
         }
@@ -113,7 +113,7 @@ class DynamicFunctionCallTests: XCTestCase {
         
         XCTAssertTrue(result is SwarmResult)
         if let swarmResult = result as? SwarmResult {
-            XCTAssertEqual(swarmResult.messages?.arrayValue.first?["content"].stringValue, "8.0")
+            XCTAssertEqual(swarmResult.messages?.first?.content(), "8.0")
         } else {
             XCTFail("Expected SwarmResult")
         }

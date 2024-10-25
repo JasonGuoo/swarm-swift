@@ -12,7 +12,7 @@ public class Swarm {
 
     public func getChatCompletion(
         agent: Agent,
-        history: Message,
+        history: [Message],
         contextVariables: [String: String],
         modelOverride: String?,
         stream: Bool? = false,
@@ -20,8 +20,8 @@ public class Swarm {
     ) -> Response {
         let contextVariables = contextVariables.merging([:]) { (_, new) in new }
         let instructions = agent.instructions ?? "You are a helpful assistant."
-        var messages = [Message(["role": "system", "content": instructions])] + (history.json.array ?? [])
-        debugPrint(debug: debug ?? false, "Getting chat completion for...:", messages)
+//        var messages = [Message(["role": "system", "content": instructions])] + (history.json.array ?? [])
+//        debugPrint(debug: debug ?? false, "Getting chat completion for...:", messages)
 
         let model = modelOverride ?? agent.model
         
@@ -30,7 +30,7 @@ public class Swarm {
         let request = Request()
         request.withModel(model:model)
     
-        request.appendMessage(message: history)
+        request.appendMessages(messages: history)
         
         request.withStream(stream ?? false)
         if let functions = agent.functions {
@@ -70,13 +70,15 @@ public class Swarm {
             }
         }
         
-        var partialResponse = SwarmResult(messages: JSON([]))
+        var partialResponse = SwarmResult(messages: [Message()])
 
         for toolCall in toolCalls {
             let name = toolCall["function"]["name"].string
             guard let function = functionMap[name ?? ""] else {
                 self.debugPrint(debug: debug ?? false, "Tool \(name ?? "") not found in function map.")
-                partialResponse.messages?.arrayObject?.append(["role": "assistant", "content": "Error: Tool \(name ?? "") not found."])
+                let errorMessage = Message()
+                errorMessage.withRole(role: "assistant").withContent(content: "Error: Tool \(name ?? "") not found.")
+                partialResponse.messages?.append(errorMessage)
                 continue
             }
 
@@ -89,13 +91,17 @@ public class Swarm {
                 rawResult = try callFunction(agent: agent, functionName: name ?? "", arguments: args)
             } catch {
                 self.debugPrint(debug: debug ?? false, "Error calling function \(name ?? ""): \(error)")
-                partialResponse.messages?.arrayObject?.append(["role": "assistant", "content": "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)"])
+                let errorMessage = Message()
+                errorMessage.withRole(role: "assistant").withContent(content: "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)")
+                partialResponse.messages?.append(errorMessage)
                 continue
             }
             
             let result = handleFunctionResult(rawResult, debug: debug)
-            if let resultMessages = result.messages?.arrayValue {
-                partialResponse.messages?.arrayObject?.append(contentsOf: resultMessages.map { $0.dictionaryObject ?? [:] })
+            if let resultMessages = result.messages {
+                for resultMessage in resultMessages {
+                    partialResponse.messages?.append(resultMessage)
+                }
             }
             if let resultAgent = result.agent {
                 partialResponse.agent = resultAgent
@@ -107,20 +113,20 @@ public class Swarm {
 
     public func run(
         agent: Agent,
-        messages: Message,
+        messages: [Message],
         contextVariables: [String: String] = [:],
         modelOverride: String? = nil,
         stream: Bool = false,
         debug: Bool = false,
-        maxTurns: Int = Int.max,
+        maxTurns: Int = 10,
         executeTools: Bool = true
     ) -> SwarmResult {
         var activeAgent = agent
         var contextVariables = contextVariables
         var history = messages
-        let initLen = history.json.array?.count ?? 0
+        let initLen = history.count
 
-        while ((history.json.array?.count ?? 0) - initLen < maxTurns) && activeAgent != nil {
+        while (history.count - initLen < maxTurns) && activeAgent != nil {
             let llmresponse = getChatCompletion(
                 agent: activeAgent,
                 history: history,
@@ -130,29 +136,32 @@ public class Swarm {
                 debug: debug
             )
 
-            guard let message = llmresponse.getChoiceMessage(at: 0) else {
+            guard let messageJSON = llmresponse.getChoiceMessage(at: 0) else {
                 self.debugPrint(debug: debug ?? false, "No message received in completion.")
                 break
             }
 
-            self.debugPrint(debug: debug ?? false, "Received completion:", message)
-            history.json.arrayObject?.append(message.dictionaryObject ?? [:])
+            self.debugPrint(debug: debug ?? false, "Received completion:", messageJSON)
+            let message = Message(messageJSON)
+            history.append(message)
 
-            if message["tool_calls"].isEmpty || !executeTools {
+            if messageJSON["tool_calls"].isEmpty || !executeTools {
                 self.debugPrint(debug: debug ?? false, "Ending turn.")
                 break
             }
 
             let partialResponse = handleToolCalls(
                 agent: activeAgent,
-                toolCalls: message["tool_calls"].arrayValue,
+                toolCalls: messageJSON["tool_calls"].arrayValue,
                 functions: activeAgent.functions?.arrayValue ?? [],
                 contextVariables: contextVariables,
                 debug: debug
             )
 
-            if let messages = partialResponse.messages?.arrayValue {
-                history.json.arrayObject?.append(contentsOf: messages.map { $0.dictionaryObject ?? [:] })
+            if let messages = partialResponse.messages {
+                for mm in messages {
+                    history.append(mm)
+                }
             }
             
             if let newAgent = partialResponse.agent {
@@ -161,7 +170,7 @@ public class Swarm {
         }
 
         return SwarmResult(
-            messages: JSON(history.json.arrayValue.dropFirst(initLen)),
+            messages: history,
             agent: activeAgent,
             contextVariables: contextVariables
         )
@@ -172,24 +181,23 @@ public class Swarm {
         case let result as SwarmResult:
             return result
         case let agent as Agent:
+            let message = Message()
+            message.withRole(role: "assistant").withContent(content: agent.name)
             return SwarmResult(
-                messages: JSON([["role": "assistant", "content": agent.name]]),
+                messages: [message],
                 agent: agent
             )
         default:
             do {
-                return SwarmResult(messages: JSON([["role": "assistant", "content": String(describing: result)]]))
+                let message = Message()
+                message.withRole(role: "assistant").withContent(content: String(describing: result))
+                return SwarmResult(messages: [message])
             } catch {
                 let errorMessage = "Failed to cast response to string: \(result). Make sure agent functions return a string or Result object. Error: \(error)"
                 self.debugPrint(debug: debug ?? false, errorMessage)
                 fatalError(errorMessage)
             }
         }
-    }
-
-    // You'll need to implement this function
-    private func callFunction(agent: Agent, functionName: String, arguments: String) throws -> Any {
-        return try! callFunction(agent: agent, functionName: functionName, arguments: arguments)
     }
 
     private func debugPrint(debug: Bool, _ items: Any...) {
