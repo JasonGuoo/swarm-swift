@@ -1,4 +1,5 @@
 import Foundation
+import SwiftyJSON
 
 public class Swarm {
     public let client: LLMClient
@@ -11,38 +12,33 @@ public class Swarm {
 
     public func getChatCompletion(
         agent: Agent,
-        history: [LLMMessage],
+        history: Message,
         contextVariables: [String: String],
         modelOverride: String?,
         stream: Bool? = false,
         debug: Bool? = false
-    ) -> LLMResponse {
+    ) -> Response {
         let contextVariables = contextVariables.merging([:]) { (_, new) in new }
         let instructions = agent.instructions ?? "You are a helpful assistant."
-        var messages = [LLMMessage(role: "system", content: instructions)] + history
+        var messages = [Message(["role": "system", "content": instructions])] + (history.json.array ?? [])
         debugPrint(debug: debug ?? false, "Getting chat completion for...:", messages)
 
-        let model = modelOverride != nil ? modelOverride! : agent.model
+        let model = modelOverride ?? agent.model
         
-        var toolChoice = ""
-        var tools = agent.functions
-        if let tools = tools {
-            toolChoice = tools.isEmpty ? "" : "auto"
+        let toolChoice = agent.functions != nil && !agent.functions!.isEmpty ? "auto" : ""
+        
+        let request = Request()
+        request.withModel(model:model)
+    
+        request.appendMessage(message: history)
+        
+        request.withStream(stream ?? false)
+        if let functions = agent.functions {
+            request.withTools(functions.arrayValue.map { $0.dictionaryObject ?? [:] })
         }
-        // create new messages with instructions
-        let newMessage = LLMMessage(role: "system", content: instructions )
-        var newmessages = [newMessage]
-        newmessages.append(contentsOf: messages)
-        
-        var request = LLMRequest(
-            model: model,
-            messages: newmessages,
-            stream: stream,
-            tools: tools,
-            toolChoice:  toolChoice
-        )
+        request.withToolChoice(["type": toolChoice])
 
-        var response: LLMResponse?
+        var response: Response?
         let semaphore = DispatchSemaphore(value: 0)
 
         client.createChatCompletion(request: request) { result in
@@ -50,76 +46,60 @@ public class Swarm {
             case .success(let llmResponse):
                 response = llmResponse
             case .failure(let error):
-                debugPrint("Error in getChatCompletion:", error)
-                response = LLMResponse(error: LLMResponse.APIError(message: error.localizedDescription))
+                self.debugPrint(debug: debug ?? false, "Error in getChatCompletion:", error)
+                response = Response(parseJSON: "{\"error\": {\"message\": \"\(error.localizedDescription)\"}}")
             }
             semaphore.signal()
         }
 
         semaphore.wait()
-        return response ?? LLMResponse()
+        return response ?? Response(parseJSON: "{}")
     }
-
-
 
     public func handleToolCalls(
         agent: Agent,
-        toolCalls: [LLMResponse.ToolCall],
-        functions: [LLMRequest.Tool],
+        toolCalls: [JSON],
+        functions: [JSON],
         contextVariables: [String: String],
         debug: Bool
     ) -> SwarmResult {
-        var functionMap:[String: LLMRequest.Function] = [:]
-        for rtool in functions {
-            functionMap[rtool.function.name] = rtool.function
+        var functionMap: [String: JSON] = [:]
+        for function in functions {
+            if let name = function["function"]["name"].string {
+                functionMap[name] = function["function"]
+            }
         }
         
-        var partialResponse = SwarmResult(messages: [])
+        var partialResponse = SwarmResult(messages: JSON([]))
 
         for toolCall in toolCalls {
-            let name = toolCall.function?.name
-            guard let function : LLMRequest.Function = functionMap[name ?? ""] else {
-                debugPrint(debug, "Tool \(name) not found in function map.")
-                partialResponse.messages?.append(LLMMessage(role:"assistant", content: "Error: Tool \(name) not found."))
+            let name = toolCall["function"]["name"].string
+            guard let function = functionMap[name ?? ""] else {
+                self.debugPrint(debug: debug ?? false, "Tool \(name ?? "") not found in function map.")
+                partialResponse.messages?.arrayObject?.append(["role": "assistant", "content": "Error: Tool \(name ?? "") not found."])
                 continue
             }
 
-            debugPrint(debug, "Processing tool call: \(name) with arguments \(toolCall.function?.arguments)")
+            self.debugPrint(debug: debug ?? false, "Processing tool call: \(name ?? "") with arguments \(toolCall["function"]["arguments"].stringValue)")
 
-            var arrayOfDictionaries:[String:Any] = [:]
-            var args = toolCall.function?.arguments
-            // Convert the JSON string to Data
-            if let jsonData = args?.data(using: .utf8) {
-                do {
-                    // Deserialize the JSON data
-                    let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: [])
-
-                    // Cast the object to an array of dictionaries
-                    if let arrayOfDictionaries = jsonObject as? [[String: Any]] {
-                        // Now you have an array of [String: Any] dictionaries
-                        for dictionary in arrayOfDictionaries {
-                            print(dictionary)
-                        }
-                    } else {
-                        print("Failed to cast JSON to [[String: Any]]")
-                    }
-                } catch {
-                    print("Error decoding JSON: \(error)")
-                }
-            } else {
-                print("Error converting String to Data")
-            }
+            let args = toolCall["function"]["arguments"].stringValue
             
-
             let rawResult: Any
             do {
-                rawResult = try callFunction(agent: agent, functionName: name ?? "", arguments: arrayOfDictionaries)
+                rawResult = try callFunction(agent: agent, functionName: name ?? "", arguments: args)
             } catch {
-                debugPrint(debug, "Error calling function \(name ?? ""): \(error)")
-                partialResponse.messages?.append(LLMMessage(role:"assistant", content: "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)"))
+                self.debugPrint(debug: debug ?? false, "Error calling function \(name ?? ""): \(error)")
+                partialResponse.messages?.arrayObject?.append(["role": "assistant", "content": "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)"])
                 continue
             }
-            let result = handleFunctionResult(rawResult, debug: debug) 
+            
+            let result = handleFunctionResult(rawResult, debug: debug)
+            if let resultMessages = result.messages?.arrayValue {
+                partialResponse.messages?.arrayObject?.append(contentsOf: resultMessages.map { $0.dictionaryObject ?? [:] })
+            }
+            if let resultAgent = result.agent {
+                partialResponse.agent = resultAgent
+            }
         }
 
         return partialResponse
@@ -127,7 +107,7 @@ public class Swarm {
 
     public func run(
         agent: Agent,
-        messages: [LLMMessage],
+        messages: Message,
         contextVariables: [String: String] = [:],
         modelOverride: String? = nil,
         stream: Bool = false,
@@ -135,39 +115,12 @@ public class Swarm {
         maxTurns: Int = Int.max,
         executeTools: Bool = true
     ) -> SwarmResult {
-
-        
-        // TODO: stream is not suppored yet
-        var is_stream = false
-        //        if stream {
-        //            var finalResponse: Response?
-        //            runAndStream(
-        //                agent: agent,
-        //                messages: messages,
-        //                contextVariables: contextVariables,
-        //                modelOverride: modelOverride,
-        //                debug: debug,
-        //                maxTurns: maxTurns,
-        //                executeTools: executeTools
-        //            ) { chunk in
-        //                if case .response(let response) = chunk {
-        //                    finalResponse = response
-        //                }
-        //            }
-        //            // Wait for the async operation to complete
-        //            while finalResponse == nil {
-        //                RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
-        //            }
-        //            return finalResponse!
-        //        }
-//
         var activeAgent = agent
         var contextVariables = contextVariables
         var history = messages
-        let initLen = messages.count
+        let initLen = history.json.array?.count ?? 0
 
-        while (history.count - initLen < maxTurns) && activeAgent != nil {
-            // Get completion with current history, agent
+        while ((history.json.array?.count ?? 0) - initLen < maxTurns) && activeAgent != nil {
             let llmresponse = getChatCompletion(
                 agent: activeAgent,
                 history: history,
@@ -177,30 +130,29 @@ public class Swarm {
                 debug: debug
             )
 
-            guard let message = llmresponse.choices?.first?.message else {
-                debugPrint(debug, "No message received in completion.")
+            guard let message = llmresponse.getChoiceMessage(at: 0) else {
+                self.debugPrint(debug: debug ?? false, "No message received in completion.")
                 break
             }
 
-            debugPrint(debug, "Received completion:", message)
-            history.append(message)
+            self.debugPrint(debug: debug ?? false, "Received completion:", message)
+            history.json.arrayObject?.append(message.dictionaryObject ?? [:])
 
-            if message.getValue("tool_calls") == nil || !executeTools {
-                debugPrint(debug, "Ending turn.")
+            if message["tool_calls"].isEmpty || !executeTools {
+                self.debugPrint(debug: debug ?? false, "Ending turn.")
                 break
             }
 
-            // Handle function calls, updating contextVariables, and switching agents
             let partialResponse = handleToolCalls(
                 agent: activeAgent,
-                toolCalls: message.getValue("tool_calls") as! [LLMResponse.ToolCall] ,
-                functions: activeAgent.functions ?? [],
+                toolCalls: message["tool_calls"].arrayValue,
+                functions: activeAgent.functions?.arrayValue ?? [],
                 contextVariables: contextVariables,
                 debug: debug
             )
 
-            if let messages = partialResponse.messages {
-                history.append(contentsOf: messages)
+            if let messages = partialResponse.messages?.arrayValue {
+                history.json.arrayObject?.append(contentsOf: messages.map { $0.dictionaryObject ?? [:] })
             }
             
             if let newAgent = partialResponse.agent {
@@ -209,31 +161,41 @@ public class Swarm {
         }
 
         return SwarmResult(
-               messages: Array(history.dropFirst(initLen)),
-               agent: activeAgent,
-               contextVariables: contextVariables
+            messages: JSON(history.json.arrayValue.dropFirst(initLen)),
+            agent: activeAgent,
+            contextVariables: contextVariables
         )
-
     }
     
     public func handleFunctionResult(_ result: Any, debug: Bool) -> SwarmResult {
-       switch result {
-       case let result as SwarmResult:
-           return result
-       case let agent as Agent:
-           return SwarmResult(
-               messages: [LLMMessage(role: "assistant", content: try!  agent.name)],
-               agent: agent
-           )
-       default:
-           do {
-               return SwarmResult(messages: [LLMMessage(role: "assistant", content: String(describing: result))])
-           } catch {
-               let errorMessage = "Failed to cast response to string: \(result). Make sure agent functions return a string or Result object. Error: \(error)"
-               debugPrint(debug, errorMessage)
-               fatalError(errorMessage)
-           }
-       }
+        switch result {
+        case let result as SwarmResult:
+            return result
+        case let agent as Agent:
+            return SwarmResult(
+                messages: JSON([["role": "assistant", "content": agent.name]]),
+                agent: agent
+            )
+        default:
+            do {
+                return SwarmResult(messages: JSON([["role": "assistant", "content": String(describing: result)]]))
+            } catch {
+                let errorMessage = "Failed to cast response to string: \(result). Make sure agent functions return a string or Result object. Error: \(error)"
+                self.debugPrint(debug: debug ?? false, errorMessage)
+                fatalError(errorMessage)
+            }
+        }
     }
 
+    // You'll need to implement this function
+    private func callFunction(agent: Agent, functionName: String, arguments: String) throws -> Any {
+        // Implementation depends on how you want to handle function calls
+        fatalError("callFunction not implemented")
+    }
+
+    private func debugPrint(debug: Bool, _ items: Any...) {
+        if debug {
+            print(items)
+        }
+    }
 }

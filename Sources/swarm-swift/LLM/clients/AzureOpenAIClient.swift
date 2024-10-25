@@ -12,13 +12,13 @@ public class AzureOpenAIClient: OpenAIClient {
         super.init(apiKey: apiKey, baseURL: endpoint)
     }
     
-    override internal func performRequest(request: LLMRequest, endpoint: String, completion: @escaping (Result<LLMResponse, Error>) -> Void) {
+    override internal func performRequest(request: Request, endpoint: String, completion: @escaping (Result<Response, Error>) -> Void) {
         // Construct the Azure-specific endpoint URL
         let azureEndpoint = "\(self.endpoint)/openai/deployments/\(deploymentId)/chat/completions?api-version=\(apiVersion)"
         
         // Ensure the endpoint URL is valid
         guard let url = URL(string: azureEndpoint) else {
-            completion(.failure(LLMError.invalidURL))
+            completion(.failure(NSError(domain: "AzureOpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
 
@@ -30,9 +30,7 @@ public class AzureOpenAIClient: OpenAIClient {
 
         // Encode the request body
         do {
-            let encoder = JSONEncoder()
-            encoder.keyEncodingStrategy = .convertToSnakeCase
-            let jsonData = try encoder.encode(request)
+            let jsonData = try request.rawData()
             urlRequest.httpBody = jsonData
             DebugUtils.printDebugJSON(jsonData)
         } catch {
@@ -54,13 +52,13 @@ public class AzureOpenAIClient: OpenAIClient {
             
             // Ensure we received a valid HTTP response
             guard let httpResponse = response as? HTTPURLResponse else {
-                completion(.failure(LLMError.requestFailed))
+                completion(.failure(NSError(domain: "AzureOpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response"])))
                 return
             }
             
             // Ensure we received data
             guard let data = data else {
-                completion(.failure(LLMError.requestFailed))
+                completion(.failure(NSError(domain: "AzureOpenAIClient", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
                 return
             }
             
@@ -70,24 +68,17 @@ public class AzureOpenAIClient: OpenAIClient {
             
             // Check if the request was successful (status code 200)
             if httpResponse.statusCode == 200 {
-                // Convert data to JSON string
-                guard let jsonString = String(data: data, encoding: .utf8) else {
-                    completion(.failure(LLMError.decodingFailed))
-                    return
-                }
-                
-                // Parse the JSON response using LLMResponse.fromJSON
-                let result = LLMResponse.fromJSON(jsonString)
-                switch result {
-                case .success(let llmResponse):
-                    completion(.success(llmResponse))
-                case .failure(let error):
+                // Parse the JSON response
+                do {
+                    let response = try Response(data: data)
+                    completion(.success(response))
+                } catch {
                     DebugUtils.printDebug("Decoding Error: \(error.localizedDescription)")
-                    completion(.failure(LLMError.decodingFailed))
+                    completion(.failure(error))
                 }
             } else {
                 // Handle non-200 status codes
-                completion(.failure(LLMError.httpError(statusCode: httpResponse.statusCode, data: data)))
+                completion(.failure(NSError(domain: "AzureOpenAIClient", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP Error", "data": data])))
             }
         }
 

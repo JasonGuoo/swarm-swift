@@ -1,4 +1,5 @@
 import Foundation
+import SwiftyJSON
 
 // Date formatter
 let dateFormatter: DateFormatter = {
@@ -14,48 +15,6 @@ func debugPrint(debug: Bool, _ args: Any...) {
     print("\u{001B}[97m[\u{001B}[90m\(timestamp)\u{001B}[97m]\u{001B}[90m \(message)\u{001B}[0m")
 }
 
-func mergeFields(target: inout [String: Any], source: [String: Any]) {
-    for (key, value) in source {
-        if let stringValue = value as? String {
-            if var targetString = target[key] as? String {
-                targetString += stringValue
-                target[key] = targetString
-            } else {
-                target[key] = stringValue
-            }
-        } else if let dictValue = value as? [String: Any] {
-            if var targetDict = target[key] as? [String: Any] {
-                mergeFields(target: &targetDict, source: dictValue)
-                target[key] = targetDict
-            } else {
-                target[key] = dictValue
-            }
-        }
-    }
-}
-
-func mergeChunk(finalResponse: inout [String: Any], delta: [String: Any]) {
-    var deltaCopy = delta
-    deltaCopy.removeValue(forKey: "role")
-    mergeFields(target: &finalResponse, source: deltaCopy)
-    
-    if let toolCalls = delta["tool_calls"] as? [[String: Any]], !toolCalls.isEmpty {
-        if let index = toolCalls[0]["index"] as? Int {
-            var toolCallCopy = toolCalls[0]
-            toolCallCopy.removeValue(forKey: "index")
-            if finalResponse["tool_calls"] == nil {
-                finalResponse["tool_calls"] = [[String: Any]]()
-            }
-            if var finalToolCalls = finalResponse["tool_calls"] as? [[String: Any]] {
-                while finalToolCalls.count <= index {
-                    finalToolCalls.append([:])
-                }
-                mergeFields(target: &finalToolCalls[index], source: toolCallCopy)
-                finalResponse["tool_calls"] = finalToolCalls
-            }
-        }
-    }
-}
 
 /// Generates the dynamic function name for Objective-C method calling.
 ///
@@ -66,7 +25,6 @@ func mergeChunk(finalResponse: inout [String: Any], delta: [String: Any]) {
 /// This function constructs the Objective-C style selector name by appending
 /// parameter names to the function name, separated by "With" and ":".
 ///
-
 func generateDynamicFunctionName(functionName: String) -> String {
     let baseNameComponents = functionName.split(separator: "_")
     let baseName = baseNameComponents.joined(separator: "_")
@@ -78,7 +36,7 @@ func generateDynamicFunctionName(functionName: String) -> String {
 /// - Parameters:
 ///   - agent: The Agent object on which to call the function.
 ///   - functionName: The name of the function to be called.
-///   - arguments: A dictionary of arguments to pass to the function.
+///   - arguments: A JSON string of arguments to pass to the function.
 /// - Returns: The result of the function call.
 /// - Throws: FunctionCallError if the function is not found or if required parameters are missing.
 ///
@@ -86,20 +44,21 @@ func generateDynamicFunctionName(functionName: String) -> String {
 /// 1. The class must inherit from NSObject.
 /// 2. The method must be marked with @objc.
 /// 3. The function name for dynamic calling is not the original name, but is constructed
-///    by joining the parameters with "With".
+///    by joining the parameters with "WithArgs:".
 ///    For example, a function get_current_weather(location, unit)
 ///    would be dynamically called using the name "get_current_weatherWithArgs:"
-func callFunction(agent: Agent, functionName: String, arguments: [String: Any]) throws -> Any {
-    // 1. Find the corresponding LLMRequest.Tool
+func callFunction(agent: Agent, functionName: String, arguments: String) throws -> Any {
+    // 1. Find the corresponding function in the agent's functions
     guard let functions = agent.functions,
-          let tool = functions.first(where: { $0.function.name == functionName }) else {
+          let tool = functions.arrayValue.first(where: { $0["function"]["name"].stringValue == functionName }) else {
         throw FunctionCallError.functionNotFound(functionName)
     }
     
     // 2. Validate arguments
-    for requiredParam in tool.function.parameters.required {
-        guard arguments.keys.contains(requiredParam) else {
-            throw FunctionCallError.missingRequiredParameter(requiredParam)
+    let argsJSON = JSON(parseJSON: arguments)
+    for requiredParam in tool["function"]["parameters"]["required"].arrayValue {
+        guard argsJSON[requiredParam.stringValue] != JSON.null else {
+            throw FunctionCallError.missingRequiredParameter(requiredParam.stringValue)
         }
     }
     
@@ -127,7 +86,7 @@ func callFunction(agent: Agent, functionName: String, arguments: [String: Any]) 
         throw FunctionCallError.functionNotFound(functionName)
     }
     
-    guard let result = agent.perform(selector, with: arguments)?.takeUnretainedValue() else {
+    guard let result = agent.perform(selector, with: argsJSON.dictionaryObject)?.takeUnretainedValue() else {
         throw FunctionCallError.functionCallFailed(functionName)
     }
     
