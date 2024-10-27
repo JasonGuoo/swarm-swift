@@ -48,9 +48,38 @@ public class Agent: NSObject, Codable {
         try container.encodeIfPresent(toolChoice, forKey: .toolChoice)
         try container.encode(parallelToolCalls, forKey: .parallelToolCalls)
     }
+    
+    public override var description: String {
+        let options: JSONSerialization.WritingOptions = [.prettyPrinted]
+        let jsonObject: [String: Any] = [
+            "name": name,
+            "model": model,
+            "instructions": instructions ?? NSNull(),
+            "functions": functions?.object ?? NSNull(),
+            "toolChoice": toolChoice ?? NSNull(),
+            "parallelToolCalls": parallelToolCalls ?? NSNull()
+        ]
+        
+        if let jsonData = try? JSONSerialization.data(withJSONObject: jsonObject, options: options),
+           let prettyPrintedString = String(data: jsonData, encoding: .utf8) {
+            return prettyPrintedString
+        }
+        
+        // Fallback to a basic description if JSON serialization fails
+        return """
+        Agent(
+            name: \(name),
+            model: \(model),
+            instructions: \(instructions ?? "nil"),
+            functions: \(functions?.description ?? "nil"),
+            toolChoice: \(toolChoice ?? "nil"),
+            parallelToolCalls: \(parallelToolCalls ?? true)
+        )
+        """
+    }
 }
 
-public class SwarmResult: Codable {
+public class SwarmResult: Codable, CustomStringConvertible {
     public var messages: [Message]?
     public var agent: Agent?
     public var contextVariables: [String: String]?
@@ -77,6 +106,37 @@ public class SwarmResult: Codable {
     
     private enum CodingKeys: String, CodingKey {
         case messages, agent, contextVariables
+    }
+    
+    public var description: String {
+        let options: JSONSerialization.WritingOptions = [.prettyPrinted]
+        var jsonObject: [String: Any] = [:]
+        
+        if let messages = messages {
+            jsonObject["messages"] = messages.map { $0.json.object }
+        }
+        
+        if let agent = agent {
+            jsonObject["agent"] = agent.description
+        }
+        
+        if let contextVariables = contextVariables {
+            jsonObject["contextVariables"] = contextVariables
+        }
+        
+        if let jsonData = try? JSONSerialization.data(withJSONObject: jsonObject, options: options),
+           let prettyPrintedString = String(data: jsonData, encoding: .utf8) {
+            return prettyPrintedString
+        }
+        
+        // Fallback to a basic description if JSON serialization fails
+        return """
+        SwarmResult(
+            messages: \(messages?.description ?? "nil"),
+            agent: \(agent?.description ?? "nil"),
+            contextVariables: \(contextVariables?.description ?? "nil")
+        )
+        """
     }
 }
 
