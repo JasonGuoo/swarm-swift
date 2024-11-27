@@ -23,7 +23,11 @@ public class Swarm {
 //        var messages = [Message(["role": "system", "content": instructions])] + (history.json.array ?? [])
 //        debugPrint(debug: debug ?? false, "Getting chat completion for...:", messages)
 
-        let model = modelOverride ?? agent.model
+        // Model selection priority:
+        // 1. modelOverride (if provided)
+        // 2. client's default model
+        // 3. agent's model (as fallback)
+        let model = modelOverride ?? client.modelName ?? agent.model ?? "gpt-4"
         
         let toolChoice = agent.functions != nil && !agent.functions!.isEmpty ? "auto" : ""
         
@@ -36,7 +40,7 @@ public class Swarm {
         if let functions = agent.functions {
             request.withTools(functions.arrayValue.map { $0.dictionaryObject ?? [:] })
         }
-        request.withToolChoice(["type": toolChoice])
+        request.withToolChoice(toolChoice)
 
         var response: Response?
         let semaphore = DispatchSemaphore(value: 0)
@@ -88,23 +92,45 @@ public class Swarm {
             
             let rawResult: Any
             do {
-                rawResult = try callFunction(agent: agent, functionName: name ?? "", arguments: args)
+                // Pass the context variables to the function call
+                rawResult = try callFunction(
+                    agent: agent,
+                    functionName: name ?? "",
+                    arguments: args,
+                    context: contextVariables
+                )
+                
+                // Create tool response message with correct role and tool_call_id
+                var swarmResult: SwarmResult?
+                
+                if let result = rawResult as? Data {
+                    swarmResult = try? JSONDecoder().decode(SwarmResult.self, from: result)
+                } else if let result = rawResult as? SwarmResult {
+                    // Already a SwarmResult object
+                    swarmResult = result
+                } else if let json = rawResult as? JSON {
+                    // JSON object, create SwarmResult
+                    let messages = json["messages"].arrayValue.map { Message($0) }
+                    swarmResult = SwarmResult(messages: messages)
+                }
+                
+                if let functionMessage = swarmResult?.messages?.first {
+                    // Instead of creating a new message, modify the existing one
+                    functionMessage.json["role"] = JSON("tool")
+                    functionMessage.json["tool_call_id"] = JSON(toolCall["id"].stringValue)
+                    partialResponse.messages?.append(functionMessage)
+                }
+                
+                // Update agent if needed
+                if let result = handleFunctionResult(rawResult, debug: debug).agent {
+                    partialResponse.agent = result
+                }
             } catch {
                 self.debugPrint(debug: debug ?? false, "Error calling function \(name ?? ""): \(error)")
                 let errorMessage = Message()
                 errorMessage.withRole(role: "assistant").withContent(content: "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)")
                 partialResponse.messages?.append(errorMessage)
                 continue
-            }
-            
-            let result = handleFunctionResult(rawResult, debug: debug)
-            if let resultMessages = result.messages {
-                for resultMessage in resultMessages {
-                    partialResponse.messages?.append(resultMessage)
-                }
-            }
-            if let resultAgent = result.agent {
-                partialResponse.agent = resultAgent
             }
         }
 

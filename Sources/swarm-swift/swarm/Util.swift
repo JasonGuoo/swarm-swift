@@ -38,14 +38,28 @@ func generateDynamicFunctionName(functionName: String) -> String {
 ///   - agent: The Agent object on which to call the function.
 ///   - functionName: The name of the function to be called.
 ///   - arguments: A JSON string of arguments to pass to the function.
+///   - context: Optional context variables to be passed to the function.
 /// - Returns: The result of the function call.
 /// - Throws: FunctionCallError if the function is not found or if required parameters are missing.
 ///
-/// This function demonstrates how to dynamically call a method on a Swift object:
-/// 1. The class must inherit from NSObject.
-/// 2. The method must be marked with @objc.
-
-func callFunction(agent: Agent, functionName: String, arguments: String) throws -> Any {
+/// Note on Swift's Limitations and Context Passing:
+/// Unlike Java (which has reflection) or Python (which has dynamic properties),
+/// Swift has limited runtime capabilities. Therefore, to pass context to functions:
+/// 1. We inject context into the args dictionary with a special "_context" key
+/// 2. Functions must explicitly extract context from args if needed
+/// 3. This approach maintains compatibility while allowing context access
+///
+/// Example function in an Agent subclass:
+/// ```swift
+/// @objc func my_function(_ args: [String: Any]) -> Data {
+///     // Access context if needed
+///     let context = args["_context"] as? [String: String]
+///     // Use context values
+///     let contextValue = context?["some_key"]
+///     // ... rest of function implementation
+/// }
+/// ```
+func callFunction(agent: Agent, functionName: String, arguments: String, context: [String: String]? = nil) throws -> Any {
     // 1. Find the corresponding function in the agent's functions
     guard let functions = agent.functions,
           let tool = functions.arrayValue.first(where: { $0["function"]["name"].stringValue == functionName }) else {
@@ -58,6 +72,14 @@ func callFunction(agent: Agent, functionName: String, arguments: String) throws 
         guard argsJSON[requiredParam.stringValue] != JSON.null else {
             throw FunctionCallError.missingRequiredParameter(requiredParam.stringValue)
         }
+    }
+    
+    // 3. Prepare the final arguments dictionary with context
+    var finalArgs = argsJSON.dictionaryObject ?? [:]
+    if let context = context, !context.isEmpty {
+        // Add context under a special key to avoid conflicts with regular args
+        finalArgs["_context"] = context
+        debugPrint(debug: true, "Injecting context into function call: \(context)")
     }
     
     // Generate the dynamic function name
@@ -85,7 +107,8 @@ func callFunction(agent: Agent, functionName: String, arguments: String) throws 
         throw FunctionCallError.functionNotFound(functionName)
     }
     
-    guard let result = agent.perform(selector, with: argsJSON.dictionaryObject)?.takeUnretainedValue() else {
+    // 4. Call the function with the combined arguments (including context)
+    guard let result = agent.perform(selector, with: finalArgs)?.takeUnretainedValue() else {
         throw FunctionCallError.functionCallFailed(functionName)
     }
     
@@ -100,30 +123,43 @@ func callFunction(agent: Agent, functionName: String, arguments: String) throws 
         throw FunctionCallError.unexpectedReturnType(functionName, String(describing: type(of: result)))
     }
 }
+
+/// Calls a function on an Agent object based on the provided function definition and arguments.
+///
+/// - Parameters:
+///   - agent: The Agent object on which to call the function.
+///   - functionName: The name of the function to be called.
+///   - arguments: A JSON string of arguments to pass to the function.
+/// - Returns: The result of the function call.
+/// - Throws: FunctionCallError if the function is not found or if required parameters are missing.
+///
+/// This function demonstrates how to dynamically call a method on a Swift object:
+/// 1. The class must inherit from NSObject.
+/// 2. The method must be marked with @objc.
+
+func callFunctionDirectly(agent: Agent, functionName: String, arguments: String) throws -> Any {
+    let dynamicFuncName = generateDynamicFunctionName(functionName: functionName)
+    let selector = NSSelectorFromString(dynamicFuncName)
     
-    func callFunctionDirectly(agent: Agent, functionName: String, arguments: String) throws -> Any {
-        let dynamicFuncName = generateDynamicFunctionName(functionName: functionName)
-        let selector = NSSelectorFromString(dynamicFuncName)
-        
-        guard agent.responds(to: selector) else {
-            throw FunctionCallError.functionNotFound(functionName)
-        }
-        
-        guard let result = agent.perform(selector, with: JSON(arguments).dictionaryObject)?.takeUnretainedValue() else {
-            throw FunctionCallError.functionCallFailed(functionName)
-        }
-        
-        if let jsonData = result as? Data {
-            do {
-                let swarmResult = try JSONDecoder().decode(SwarmResult.self, from: jsonData)
-                return swarmResult
-            } catch {
-                throw FunctionCallError.deserializationFailed(functionName, error)
-            }
-        } else {
-            throw FunctionCallError.unexpectedReturnType(functionName, String(describing: type(of: result)))
-        }
+    guard agent.responds(to: selector) else {
+        throw FunctionCallError.functionNotFound(functionName)
     }
+    
+    guard let result = agent.perform(selector, with: JSON(arguments).dictionaryObject)?.takeUnretainedValue() else {
+        throw FunctionCallError.functionCallFailed(functionName)
+    }
+    
+    if let jsonData = result as? Data {
+        do {
+            let swarmResult = try JSONDecoder().decode(SwarmResult.self, from: jsonData)
+            return swarmResult
+        } catch {
+            throw FunctionCallError.deserializationFailed(functionName, error)
+        }
+    } else {
+        throw FunctionCallError.unexpectedReturnType(functionName, String(describing: type(of: result)))
+    }
+}
 
 /// Enum representing errors that can occur during function calls.
 enum FunctionCallError: Error, Equatable {

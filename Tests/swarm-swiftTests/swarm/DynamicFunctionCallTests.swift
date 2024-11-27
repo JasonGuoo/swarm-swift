@@ -14,7 +14,7 @@ class DynamicFunctionCallTests: XCTestCase {
         }
         
         override init(name: String = "WeatherAgent",
-                      model: String = "gpt-4",
+                      model: String? = "gpt-4",
                       instructions: @escaping (() -> String) = { "You are a helpful weather agent." },
                       functions: JSON? = nil,
                       toolChoice: String? = "auto",
@@ -61,7 +61,7 @@ class DynamicFunctionCallTests: XCTestCase {
         }
         
         override init(name: String = "CalculatorAgent",
-                      model: String = "gpt-4",
+                      model: String? = "gpt-4",
                       instructions: @escaping (() -> String) = { "You are a helpful calculator agent." },
                       functions: JSON? = nil,
                       toolChoice: String? = "auto",

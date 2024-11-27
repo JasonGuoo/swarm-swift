@@ -4,14 +4,14 @@ import SwiftyJSON
 /// Represents an agent in the swarm.
 public class Agent: NSObject, Codable {
     var name: String
-    var model: String
+    var model: String?
     var instructions: String?
     var functions: JSON?
     var toolChoice: String? 
     var parallelToolCalls: Bool? = true
     
     init(name: String = "Agent",
-         model: String = "gpt-4o",
+         model: String? = nil,
          instructions: @escaping (() -> String) = { "You are a helpful agent." },
          functions: JSON? = nil,
          toolChoice: String? = "auto",
@@ -32,7 +32,7 @@ public class Agent: NSObject, Codable {
     required public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
-        model = try container.decode(String.self, forKey: .model)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
         instructions = try container.decodeIfPresent(String.self, forKey: .instructions)
         functions = try container.decodeIfPresent(JSON.self, forKey: .functions)
         toolChoice = try container.decodeIfPresent(String.self, forKey: .toolChoice)
@@ -42,7 +42,7 @@ public class Agent: NSObject, Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(name, forKey: .name)
-        try container.encode(model, forKey: .model)
+        try container.encodeIfPresent(model, forKey: .model)
         try container.encodeIfPresent(instructions, forKey: .instructions)
         try container.encodeIfPresent(functions, forKey: .functions)
         try container.encodeIfPresent(toolChoice, forKey: .toolChoice)
@@ -53,7 +53,7 @@ public class Agent: NSObject, Codable {
         let options: JSONSerialization.WritingOptions = [.prettyPrinted]
         let jsonObject: [String: Any] = [
             "name": name,
-            "model": model,
+            "model": model ?? NSNull(),
             "instructions": instructions ?? NSNull(),
             "functions": functions?.object ?? NSNull(),
             "toolChoice": toolChoice ?? NSNull(),
@@ -69,7 +69,7 @@ public class Agent: NSObject, Codable {
         return """
         Agent(
             name: \(name),
-            model: \(model),
+            model: \(model ?? "nil"),
             instructions: \(instructions ?? "nil"),
             functions: \(functions?.description ?? "nil"),
             toolChoice: \(toolChoice ?? "nil"),
@@ -157,7 +157,7 @@ public class SwarmResult: Codable, CustomStringConvertible {
  2. Override the initializer:
     ```
     override init(name: String = "MyCustomAgent",
-                  model: String = "gpt-4",
+                  model: String? = nil,
                   instructions: @escaping (() -> String) = { "You are a helpful custom agent." },
                   functions: JSON? = nil,
                   toolChoice: String? = "auto",
@@ -247,4 +247,3 @@ public class SwarmResult: Codable, CustomStringConvertible {
  - The encoding and decoding of SwarmResult is handled automatically by the framework, but be
    aware that this process is happening behind the scenes.
  */
-

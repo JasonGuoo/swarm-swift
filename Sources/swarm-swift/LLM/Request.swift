@@ -98,7 +98,7 @@ import SwiftyJSON
         ]
     ]
     request.withTools(tools)
-    request.withToolChoice(["type": "auto"])
+    request.withToolChoice("auto")
 */
 public class Request: MessageBase, CustomStringConvertible {
     
@@ -195,7 +195,10 @@ public class Request: MessageBase, CustomStringConvertible {
         json[CodingKeys.tools.rawValue] = JSON(tools)
     }
     
-    public func withToolChoice(_ toolChoice: [String: Any]) {
+    /**
+     Sets the tool_choice for the request.
+     */
+    public func withToolChoice(_ toolChoice: String) {
         json[CodingKeys.toolChoice.rawValue] = JSON(toolChoice)
     }
     
@@ -292,6 +295,19 @@ public class Request: MessageBase, CustomStringConvertible {
             return prettyPrintedString
         }
         return json.description // Fallback to default description if beautification fails
+    }
+    
+    public func rawData() throws -> Data {
+        // Filter out empty messages
+        if let messages = json["messages"].array {
+            let nonEmptyMessages = messages.filter { message in
+                // Keep messages that have either content or tool_calls
+                return !message["content"].stringValue.isEmpty || !message["tool_calls"].isEmpty
+            }
+            json["messages"] = JSON(nonEmptyMessages)
+        }
+        
+        return try JSONSerialization.data(withJSONObject: json.dictionaryObject ?? [:], options: [])
     }
 }
 

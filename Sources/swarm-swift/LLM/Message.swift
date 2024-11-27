@@ -32,6 +32,11 @@ public class Message: MessageBase, Codable, CustomStringConvertible {
         return self
     }
     
+    public func withToolCallId(id: String) -> Message {
+        setString(forKey: "tool_call_id", value: id)
+        return self
+    }
+    
     public required init(from decoder: Decoder) throws {
         super.init()
         let container = try decoder.singleValueContainer()
