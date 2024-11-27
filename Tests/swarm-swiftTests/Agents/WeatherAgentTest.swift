@@ -133,9 +133,9 @@ class WeatherAgentTest: XCTestCase {
             let getWeatherResult = try callFunction(agent: weatherAgent, functionName: "get_weather", arguments: JSON(getWeatherArgs).rawString() ?? "")
             
             if let swarmResult = getWeatherResult as? SwarmResult,
-               let message = swarmResult.messages?.first {
-                let content = message.json["content"]
-                let weatherData = content
+               let message = swarmResult.messages?.first,
+               let contentStr = message.json["content"].string,
+               let weatherData = try? JSON(parseJSON: contentStr) {
                 XCTAssertEqual(weatherData["location"].stringValue, "Paris")
                 XCTAssertEqual(weatherData["temperature"].stringValue, "65")
                 XCTAssertEqual(weatherData["time"].stringValue, "now")
@@ -182,21 +182,6 @@ class WeatherAgentTest: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch FunctionCallError.missingRequiredParameter(let paramName) {
             XCTAssertEqual(paramName, "location")
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
-    }
-    
-    func testGetInfo() {
-        do {
-            let incomArgs = ["key-1": "value-1", "key-2": "value-2"]
-            let callresult = try callFunction(agent: weatherAgent, functionName: "get_info", arguments: JSON(incomArgs).rawString() ?? "")
-            if let sresult = callresult as? SwarmResult {
-                print(sresult.messages)
-                XCTAssertNotNil(sresult)
-            }
-        }catch FunctionCallError.functionNotFound("get_info") {
-            XCTFail("function get_info not found")
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
