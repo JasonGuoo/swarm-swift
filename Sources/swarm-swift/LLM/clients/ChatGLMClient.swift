@@ -8,17 +8,24 @@ public class ChatGLMClient: LLMClient {
         case glm4Flash = "glm-4-flash" // Free to use: ZhipuAI's first free API, zero-cost access to large models
     }
     
-    override public init(apiKey: String, baseURL: String) {
-        super.init(apiKey: apiKey, baseURL: baseURL)
+    override public init(apiKey: String, baseURL: String, modelName: String? = "glm-4-flash") {
+        super.init(apiKey: apiKey, baseURL: baseURL, modelName: modelName)
     }
     
     override func createChatCompletion(request: Request, completion: @escaping (Result<Response, Error>) -> Void) {
         let endpoint = "\(baseURL)"
+        // If model is not set in the request but we have a default model name, use it
+        if request.json["model"].string == nil && modelName != nil {
+            request.withModel(model: modelName!)
+        }
         performRequest(request: request, endpoint: endpoint, completion: completion)
     }
     
     override func createCompletion(request: Request, completion: @escaping (Result<Response, Error>) -> Void) {
-        
+        // If model is not set in the request but we have a default model name, use it
+        if request.json["model"].string == nil && modelName != nil {
+            request.withModel(model: modelName!)
+        }
         createChatCompletion(request: request, completion: completion)
     }
     
@@ -57,7 +64,6 @@ public class ChatGLMClient: LLMClient {
 
         // Encode the request body
         do {
-            request.withModel(model:ModelType.glm4Flash.rawValue) // Use the default model or allow it to be specified
             let jsonData = try request.rawData()
             urlRequest.httpBody = jsonData
             DebugUtils.printDebugJSON(jsonData)

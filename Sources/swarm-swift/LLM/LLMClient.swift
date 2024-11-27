@@ -10,10 +10,12 @@ import Foundation
 public class LLMClient {
     var apiKey: String
     var baseURL: String
+    var modelName: String?
 
-    init(apiKey: String, baseURL: String) {
+    init(apiKey: String, baseURL: String, modelName: String? = nil) {
         self.apiKey = apiKey
         self.baseURL = baseURL
+        self.modelName = modelName
     }
 
     // Main method for creating chat completions

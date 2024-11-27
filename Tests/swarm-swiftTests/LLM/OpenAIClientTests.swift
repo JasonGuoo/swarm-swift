@@ -4,15 +4,17 @@ import SwiftyJSON
 
 class OpenAIClientTests: XCTestCase {
     var client: LLMClient!
+    var config: Config!
     
     override func setUp() {
         super.setUp()
-        let config = TestUtils.loadConfig(for: "openai")
+        config = TestUtils.loadConfig(for: "openai")
         client = ClientFactory.getLLMClient(apiType: "OpenAI", config: config)
     }
     
     override func tearDown() {
         client = nil
+        config = nil
         super.tearDown()
     }
     
@@ -20,7 +22,7 @@ class OpenAIClientTests: XCTestCase {
         let expectation = self.expectation(description: "Chat completion")
         
         let request = Request()
-        request.withModel(model: "gpt4o")
+//        request.withModel(model: config.value(forKey: "model") ?? "")
         
         let systemMessage = Message()
         systemMessage.withRole(role: "system")
@@ -71,7 +73,7 @@ class OpenAIClientTests: XCTestCase {
         
         let jsonString = """
         {
-          "model": "gpt-3.5-turbo",
+          "model": "\(config.value(forKey: "OpenAI_MODEL_NAME") ?? "")",
           "messages": [
             {
               "role": "user",

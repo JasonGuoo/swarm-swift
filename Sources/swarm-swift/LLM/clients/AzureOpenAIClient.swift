@@ -5,11 +5,11 @@ public class AzureOpenAIClient: OpenAIClient {
     public let apiVersion: String
     public let deploymentId: String
     
-    public init(apiKey: String, endpoint: String, apiVersion: String, deploymentId: String) {
+    public init(apiKey: String, endpoint: String, apiVersion: String, deploymentId: String, modelName: String? = nil) {
         self.endpoint = endpoint
         self.apiVersion = apiVersion
         self.deploymentId = deploymentId
-        super.init(apiKey: apiKey, baseURL: endpoint)
+        super.init(apiKey: apiKey, baseURL: endpoint, modelName: modelName)
     }
     
     override internal func performRequest(request: Request, endpoint: String, completion: @escaping (Result<Response, Error>) -> Void) {

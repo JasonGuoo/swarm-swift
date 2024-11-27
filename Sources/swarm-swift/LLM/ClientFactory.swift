@@ -35,7 +35,8 @@ public class ClientFactory {
     private static func createOpenAIClient(config: Config) -> OpenAIClient? {
         guard let apiKey = config.value(forKey: "OpenAI_API_KEY"),
               let baseURL = config.value(forKey: "OpenAI_API_BASE_URL") else { return nil }
-        return OpenAIClient(apiKey: apiKey, baseURL: baseURL)
+        let modelName = config.value(forKey: "OpenAI_MODEL_NAME")
+        return OpenAIClient(apiKey: apiKey, baseURL: baseURL, modelName: modelName)
     }
     
     private static func createAzureOpenAIClient(config: Config) -> AzureOpenAIClient? {
@@ -43,13 +44,20 @@ public class ClientFactory {
               let endpoint = config.value(forKey: "AzureOpenAI_API_BASE_URL"),
               let apiVersion = config.value(forKey: "AzureOpenAI_API_VERSION"),
               let deploymentId = config.value(forKey: "AzureOpenAI_DEPLOYMENT_ID") else { return nil }
-        return AzureOpenAIClient(apiKey: apiKey, endpoint: endpoint, apiVersion: apiVersion, deploymentId: deploymentId)
+        let modelName = config.value(forKey: "AzureOpenAI_MODEL_NAME")
+        return AzureOpenAIClient(apiKey: apiKey, 
+                               endpoint: endpoint, 
+                               apiVersion: apiVersion, 
+                               deploymentId: deploymentId, 
+                               modelName: modelName)
     }
     
     private static func createOllamaClient(config: Config) -> OllamaClient? {
         guard let apiKey = config.value(forKey: "Ollama_API_KEY"),
               let baseURL = config.value(forKey: "Ollama_API_BASE_URL") else { return nil }
-        return OllamaClient(apiKey: apiKey, baseURL: baseURL)
+        // Use llama3 as default model if not specified in config
+        let modelName = config.value(forKey: "Ollama_MODEL_NAME") ?? "llama3"
+        return OllamaClient(apiKey: apiKey, baseURL: baseURL, modelName: modelName)
     }
     
     private static func createDeepSeekClient(config: Config) -> DeepSeekClient? {
@@ -61,6 +69,8 @@ public class ClientFactory {
     private static func createChatGLMClient(config: Config) -> ChatGLMClient? {
         guard let apiKey = config.value(forKey: "ChatGLM_API_KEY"),
               let baseURL = config.value(forKey: "ChatGLM_API_BASE_URL") else { return nil }
-        return ChatGLMClient(apiKey: apiKey, baseURL: baseURL)
+        // Use glm-4-flash as default model if not specified in config
+        let modelName = config.value(forKey: "ChatGLM_MODEL_NAME") ?? "glm-4-flash"
+        return ChatGLMClient(apiKey: apiKey, baseURL: baseURL, modelName: modelName)
     }
 }

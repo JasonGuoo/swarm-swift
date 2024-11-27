@@ -25,16 +25,19 @@ import Foundation
     For OpenAI:
     OpenAI_API_KEY=your_actual_api_key_here
     OpenAI_API_BASE_URL=https://api.openai.com/v1
+    OpenAI_MODEL_NAME=gpt-4
 
     For Azure OpenAI:
     AzureOpenAI_API_KEY=your_azure_api_key_here
     AzureOpenAI_API_BASE_URL=https://your-resource-name.openai.azure.com
     AzureOpenAI_API_VERSION=2023-05-15
     AzureOpenAI_DEPLOYMENT_ID=your_deployment_id_here
+    AzureOpenAI_MODEL_NAME=gpt-4
 
     For Ollama:
     Ollama_API_KEY=your_ollama_api_key_here
     Ollama_API_BASE_URL=http://localhost:11434
+    Ollama_MODEL_NAME=llama2
 
     For DeepSeek:
     DeepSeek_API_KEY=your_deepseek_api_key_here
@@ -43,6 +46,7 @@ import Foundation
     For ChatGLM:
     ChatGLM_API_KEY=your_chatglm_api_key_here
     ChatGLM_API_BASE_URL=https://api.chatglm.com
+    ChatGLM_MODEL_NAME=glm-4-flash
 
  5. Ensure that you keep these .env files secure and never commit them to version control.
 

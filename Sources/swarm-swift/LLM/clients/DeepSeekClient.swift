@@ -1,8 +1,8 @@
 import Foundation
 
 public class DeepSeekClient: LLMClient {
-    override public init(apiKey: String, baseURL: String) {
-        super.init(apiKey: apiKey, baseURL: baseURL)
+    override public init(apiKey: String, baseURL: String, modelName: String? = "deepseek-chat") {
+        super.init(apiKey: apiKey, baseURL: baseURL, modelName: modelName)
     }
 
     override func createChatCompletion(request: Request, completion: @escaping (Result<Response, Error>) -> Void) {
@@ -12,7 +12,7 @@ public class DeepSeekClient: LLMClient {
         }
 
         let parameters: [String: Any] = [
-            "model": "deepseek-chat",
+            "model": modelName ?? "deepseek-chat",
             "messages": request.json["messages"].arrayValue.map { ["role": $0["role"].stringValue, "content": $0["content"].stringValue] }
         ]
 
@@ -26,7 +26,7 @@ public class DeepSeekClient: LLMClient {
         }
 
         let parameters: [String: Any] = [
-            "model": request.json["model"].stringValue,
+            "model": modelName ?? "deepseek-chat",
             "prompt": request.json["messages"].arrayValue.last?["content"].stringValue ?? "",
             "max_tokens": request.json["max_tokens"].intValue,
             "temperature": request.json["temperature"].floatValue

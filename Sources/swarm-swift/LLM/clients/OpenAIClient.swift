@@ -2,22 +2,34 @@ import Foundation
 import AVFoundation
 
 public class OpenAIClient: LLMClient {
-    override public init(apiKey: String, baseURL: String) {
-        super.init(apiKey: apiKey, baseURL: baseURL)
+    override public init(apiKey: String, baseURL: String, modelName: String? = nil) {
+        super.init(apiKey: apiKey, baseURL: baseURL, modelName: modelName)
     }
 
     override func createChatCompletion(request: Request, completion: @escaping (Result<Response, Error>) -> Void) {
         let endpoint = "\(baseURL)/chat/completions"
+        // If model is not set in the request but we have a default model name, use it
+        if request.json["model"].string == nil && modelName != nil {
+            request.withModel(model: modelName!)
+        }
         performRequest(request: request, endpoint: endpoint, completion: completion)
     }
 
     override func createCompletion(request: Request, completion: @escaping (Result<Response, Error>) -> Void) {
         let endpoint = "\(baseURL)/completions"
+        // If model is not set in the request but we have a default model name, use it
+        if request.json["model"].string == nil && modelName != nil {
+            request.withModel(model: modelName!)
+        }
         performRequest(request: request, endpoint: endpoint, completion: completion)
     }
 
     override func createEmbedding(request: Request, completion: @escaping (Result<Response, Error>) -> Void) {
         let endpoint = "\(baseURL)/embeddings"
+        // If model is not set in the request but we have a default model name, use it
+        if request.json["model"].string == nil && modelName != nil {
+            request.withModel(model: modelName!)
+        }
         performRequest(request: request, endpoint: endpoint, completion: completion)
     }
 
@@ -102,4 +114,3 @@ public class OpenAIClient: LLMClient {
         task.resume()
     }
 }
-
