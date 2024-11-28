@@ -4,7 +4,7 @@ import SwiftyJSON
 
 class WeatherAgent: Agent {
     override init(name: String = "Weather Agent",
-                  model: String = "gpt-4",
+                  model: String? = "gpt-4",
                   instructions: @escaping (() -> String) = { "You are a helpful weather agent." },
                   functions: JSON? = nil,
                   toolChoice: String? = "auto",
