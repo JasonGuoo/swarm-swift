@@ -89,6 +89,49 @@ func callFunction(agent: Agent, functionName: String, arguments: String) throws 
         throw FunctionCallError.functionCallFailed(functionName)
     }
     
+    // Return the result directly if it's a String or Agent
+    if result is String || result is Agent {
+        return result
+    }
+    
+    // For backward compatibility, try to handle Data type
+    if let jsonData = result as? Data {
+        do {
+            let swarmResult = try JSONDecoder().decode(SwarmResult.self, from: jsonData)
+            return swarmResult
+        } catch {
+            throw FunctionCallError.deserializationFailed(functionName, error)
+        }
+    }
+    
+    throw FunctionCallError.unexpectedReturnType(functionName, String(describing: type(of: result)))
+}
+
+/// Calls a function on an Agent object based on the provided function definition and arguments.
+///
+/// - Parameters:
+///   - agent: The Agent object on which to call the function.
+///   - functionName: The name of the function to be called.
+///   - arguments: A JSON string of arguments to pass to the function.
+/// - Returns: The result of the function call.
+/// - Throws: FunctionCallError if the function is not found or if required parameters are missing.
+///
+/// This function demonstrates how to dynamically call a method on a Swift object:
+/// 1. The class must inherit from NSObject.
+/// 2. The method must be marked with @objc.
+
+func callFunctionDirectly(agent: Agent, functionName: String, arguments: String) throws -> Any {
+    let dynamicFuncName = generateDynamicFunctionName(functionName: functionName)
+    let selector = NSSelectorFromString(dynamicFuncName)
+    
+    guard agent.responds(to: selector) else {
+        throw FunctionCallError.functionNotFound(functionName)
+    }
+    
+    guard let result = agent.perform(selector, with: JSON(arguments).dictionaryObject)?.takeUnretainedValue() else {
+        throw FunctionCallError.functionCallFailed(functionName)
+    }
+    
     if let jsonData = result as? Data {
         do {
             let swarmResult = try JSONDecoder().decode(SwarmResult.self, from: jsonData)
@@ -100,30 +143,6 @@ func callFunction(agent: Agent, functionName: String, arguments: String) throws 
         throw FunctionCallError.unexpectedReturnType(functionName, String(describing: type(of: result)))
     }
 }
-    
-    func callFunctionDirectly(agent: Agent, functionName: String, arguments: String) throws -> Any {
-        let dynamicFuncName = generateDynamicFunctionName(functionName: functionName)
-        let selector = NSSelectorFromString(dynamicFuncName)
-        
-        guard agent.responds(to: selector) else {
-            throw FunctionCallError.functionNotFound(functionName)
-        }
-        
-        guard let result = agent.perform(selector, with: JSON(arguments).dictionaryObject)?.takeUnretainedValue() else {
-            throw FunctionCallError.functionCallFailed(functionName)
-        }
-        
-        if let jsonData = result as? Data {
-            do {
-                let swarmResult = try JSONDecoder().decode(SwarmResult.self, from: jsonData)
-                return swarmResult
-            } catch {
-                throw FunctionCallError.deserializationFailed(functionName, error)
-            }
-        } else {
-            throw FunctionCallError.unexpectedReturnType(functionName, String(describing: type(of: result)))
-        }
-    }
 
 /// Enum representing errors that can occur during function calls.
 enum FunctionCallError: Error, Equatable {

@@ -8,7 +8,7 @@
 import Foundation
 import SwiftyJSON
 
-public class Message: MessageBase, Codable, CustomStringConvertible {
+public class Message: MessageBase, CustomStringConvertible {
     
     public override init() {
         super.init()
@@ -32,13 +32,31 @@ public class Message: MessageBase, Codable, CustomStringConvertible {
         return self
     }
     
+    public func withToolCallId(_ id: String) -> Message {
+        setString(forKey: "tool_call_id", value: id)
+        return self
+    }
+    
+    public func withToolName(_ name: String) -> Message {
+        setString(forKey: "tool_name", value: name)
+        return self
+    }
+    
+    public func toolCallId() -> String {
+        return getString(key: "tool_call_id")
+    }
+    
+    public func toolName() -> String {
+        return getString(key: "tool_name")
+    }
+    
     public required init(from decoder: Decoder) throws {
         super.init()
         let container = try decoder.singleValueContainer()
         json = try container.decode(JSON.self)
     }
     
-    public func encode(to encoder: Encoder) throws {
+    public override func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(json)
     }

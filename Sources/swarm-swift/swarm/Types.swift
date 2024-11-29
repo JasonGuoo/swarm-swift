@@ -92,20 +92,20 @@ public class SwarmResult: Codable, CustomStringConvertible {
     
     public required init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        messages = try container.decodeIfPresent([MessageCodable].self, forKey: .messages)?.map { Message($0.json) }
+        messages = try container.decodeIfPresent([Message].self, forKey: .messages)
         agent = try container.decodeIfPresent(Agent.self, forKey: .agent)
         contextVariables = try container.decodeIfPresent([String: String].self, forKey: .contextVariables)
     }
     
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(messages?.map { MessageCodable($0.json) }, forKey: .messages)
-        try container.encodeIfPresent(agent, forKey: .agent)
-        try container.encodeIfPresent(contextVariables, forKey: .contextVariables)
+    enum CodingKeys: String, CodingKey {
+        case messages, agent, contextVariables
     }
     
-    private enum CodingKeys: String, CodingKey {
-        case messages, agent, contextVariables
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(messages, forKey: .messages)
+        try container.encodeIfPresent(agent, forKey: .agent)
+        try container.encodeIfPresent(contextVariables, forKey: .contextVariables)
     }
     
     public var description: String {
@@ -141,110 +141,76 @@ public class SwarmResult: Codable, CustomStringConvertible {
 }
 
 // MARK: - How to Implement a Custom Agent
-
 /**
- How to Implement a Custom Agent
- 
  To create your own custom agent, follow these steps:
  
  1. Create a new class that inherits from Agent:
-    ```
+    ```swift
     class MyCustomAgent: Agent {
-        // Custom properties and methods
+        override init(name: String = "My Custom Agent",
+                     model: String = "gpt-4",
+                     instructions: @escaping (() -> String) = { "You are a helpful custom agent." },
+                     functions: JSON? = nil,
+                     toolChoice: String? = "auto",
+                     parallelToolCalls: Bool? = true) {
+            // Define your custom functions here
+            let customFunction = JSON([
+                "type": "function",
+                "function": [
+                    "name": "my_function",
+                    "description": "Description of what your function does",
+                    "parameters": [
+                        "type": "object",
+                        "properties": [
+                            "param1": ["type": "string", "description": "Description of param1"],
+                            "param2": ["type": "integer", "description": "Description of param2"]
+                        ],
+                        "required": ["param1"]
+                    ]
+                ]
+            ])
+            
+            // Pass your functions to super.init
+            let agentFunctions = functions ?? JSON([customFunction])
+            super.init(name: name,
+                      model: model,
+                      instructions: instructions,
+                      functions: agentFunctions,
+                      toolChoice: toolChoice,
+                      parallelToolCalls: parallelToolCalls)
+        }
+        
+        required init(from decoder: Decoder) throws {
+            try super.init(from: decoder)
+        }
+        
+        // Implement your custom functions
+        @objc func my_function(_ args: [String: Any]) -> Any {
+            // Parse arguments
+            let param1 = args["param1"] as? String ?? ""
+            let param2 = args["param2"] as? Int ?? 0
+            
+            // Your custom logic here
+            return "Result: \(param1), \(param2)"
+        }
     }
     ```
  
- 2. Override the initializer:
-    ```
-    override init(name: String = "MyCustomAgent",
-                  model: String = "gpt-4",
-                  instructions: @escaping (() -> String) = { "You are a helpful custom agent." },
-                  functions: JSON? = nil,
-                  toolChoice: String? = "auto",
-                  parallelToolCalls: Bool? = true) {
-        // Custom initialization
-        super.init(name: name,
-                   model: model,
-                   instructions: instructions,
-                   functions: functions ?? JSON([/* Your custom functions */]),
-                   toolChoice: toolChoice,
-                   parallelToolCalls: parallelToolCalls)
-    }
-    ```
+ 2. Define your custom functions in the initializer:
+    - Use JSON format to define function signatures
+    - Include name, description, and parameters
+    - Specify required parameters
  
- 3. Implement the required initializer for Codable conformance:
-    ```
-    required init(from decoder: Decoder) throws {
-        try super.init(from: decoder)
-    }
-    ```
- 
- 4. Define your custom functions:
-    - Use the @objc attribute to make the function visible to Objective-C runtime
-    - Keep the function name as same as the function name in the function definition
+ 3. Implement your custom functions:
+    - Use the @objc attribute for dynamic function calls
     - Accept a single [String: Any] parameter
-    - Return Data (encoded SwarmResult)
-    - Parse the arguments inside the function
-    
-    Example:
-    ```
-    @objc func myCustomFunction(_ args: [String: Any]) -> Data {
-        // Parse args
-        let param1 = args["param1"] as? String ?? "default"
-        let param2 = args["param2"] as? Int ?? 0
-        
-        // Perform your custom logic
-        let result = "Processed: \(param1), \(param2)"
-        
-        // Create and encode SwarmResult
-        let swarmResult = SwarmResult(messages: JSON(["role": "function", "content": result]))
-        return try! JSONEncoder().encode(swarmResult)
-    }
-    ```
+    - Return String for function results or Agent for agent switching
+    - Handle argument parsing and validation
  
- 5. Define the function description in the initializer:
+ 4. Use your custom agent:
+    ```swift
+    let myAgent = MyCustomAgent()
+    let swarm = Swarm(client: llmClient)
+    let result = swarm.run(agent: myAgent, messages: [], contextVariables: [:])
     ```
-    let myCustomFunction = JSON([
-        "type": "function",
-        "function": [
-            "name": "my_custom_function",
-            "description": "Description of what your function does",
-            "parameters": [
-                "type": "object",
-                "properties": [
-                    "param1": ["type": "string", "description": "Description of param1"],
-                    "param2": ["type": "number", "description": "Description of param2"]
-                ],
-                "required": ["param1", "param2"]
-            ]
-        ]
-    ])
-    ```
- This JSON description of functions is necessary because Swift lacks the reflection capabilities 
- found in languages like Python. We can't automatically generate these descriptions for functions 
- defined in the Agent. However, when we query the LLM to determine if function calls are needed, 
- it requires detailed information about the available functions.
- 
- 6. Add the function to the `functions` array in the initializer:
-    ```
-    super.init(name: name,
-               model: model,
-               instructions: instructions,
-               functions: functions ?? JSON([myCustomFunction]),
-               toolChoice: toolChoice,
-               parallelToolCalls: parallelToolCalls)
-    ```
- 
- By following these steps, you can create a custom agent that can be used with the Swarm framework.
- The custom functions you define will be callable using the `callFunction` method in `Util.swift`.
- 
- Remember:
- - Your function must accept all arguments in a single [String: Any] dictionary.
- - You need to parse and validate the arguments inside your function.
- - Handle errors appropriately in your function implementation.
- - Ensure that your function's implementation matches the description and parameters you provide
-   in the function definition.
- - The encoding and decoding of SwarmResult is handled automatically by the framework, but be
-   aware that this process is happening behind the scenes.
  */
-

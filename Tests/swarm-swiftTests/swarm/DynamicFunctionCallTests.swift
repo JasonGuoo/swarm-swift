@@ -9,7 +9,7 @@ class DynamicFunctionCallTests: XCTestCase {
             let location = args["location"] as? String ?? "Unknown"
             let unit = args["unit"] as? String ?? "fahrenheit"
             let returnvalue = "Current weather in \(location): 25°\(unit)"
-            let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: returnvalue)])
+            let result = SwarmResult(messages: [Message().withRole(role: "tool").withContent(content: returnvalue)])
             return try! JSONEncoder().encode(result)
         }
         
@@ -52,11 +52,11 @@ class DynamicFunctionCallTests: XCTestCase {
         @objc func addWithArgs(_ args: [String: Any]) -> Data {
             guard let a = args["a"] as? Double,
                   let b = args["b"] as? Double else {
-                let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: "Error: Invalid arguments")])
+                let result = SwarmResult(messages: [Message().withRole(role: "tool").withContent(content: "Error: Invalid arguments")])
                 return try! JSONEncoder().encode(result)
             }
             let returnvalue = a + b
-            let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: "\(returnvalue)")])
+            let result = SwarmResult(messages: [Message().withRole(role: "tool").withContent(content: "\(returnvalue)")])
             return try! JSONEncoder().encode(result)
         }
         

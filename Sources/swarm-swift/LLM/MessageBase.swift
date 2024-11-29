@@ -8,8 +8,7 @@
 import Foundation
 import SwiftyJSON
 
-public class MessageBase
-{
+public class MessageBase: Codable {
     public var json: JSON = JSON()
     
     public init() {
@@ -40,6 +39,16 @@ public class MessageBase
         default:
             self.json = JSON(object)
         }
+    }
+    
+    public required init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        json = try container.decode(JSON.self)
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(json)
     }
     
     public func getString(key: String) ->String{

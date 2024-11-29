@@ -23,7 +23,7 @@ public class Swarm {
 //        var messages = [Message(["role": "system", "content": instructions])] + (history.json.array ?? [])
 //        debugPrint(debug: debug ?? false, "Getting chat completion for...:", messages)
 
-        let model = modelOverride ?? agent.model
+        let model = modelOverride ?? client.modelName ?? agent.model
         
         let toolChoice = agent.functions != nil && !agent.functions!.isEmpty ? "auto" : ""
         
@@ -70,19 +70,24 @@ public class Swarm {
             }
         }
         
-        var partialResponse = SwarmResult(messages: [Message()])
+        var partialResponse = SwarmResult(messages: [])
 
         for toolCall in toolCalls {
             let name = toolCall["function"]["name"].string
+            let toolCallId = toolCall["id"].string ?? UUID().uuidString
+            
             guard let function = functionMap[name ?? ""] else {
-                self.debugPrint(debug: debug ?? false, "Tool \(name ?? "") not found in function map.")
+                self.debugPrint(debug: debug, "Tool \(name ?? "") not found in function map.")
                 let errorMessage = Message()
-                errorMessage.withRole(role: "assistant").withContent(content: "Error: Tool \(name ?? "") not found.")
+                errorMessage.withRole(role: "tool")
+                    .withContent(content: "Error: Tool \(name ?? "") not found.")
+                    .withToolCallId(toolCallId)
+                    .withToolName(name ?? "unknown")
                 partialResponse.messages?.append(errorMessage)
                 continue
             }
 
-            self.debugPrint(debug: debug ?? false, "Processing tool call: \(name ?? "") with arguments \(toolCall["function"]["arguments"].stringValue)")
+            self.debugPrint(debug: debug, "Processing tool call: \(name ?? "") with arguments \(toolCall["function"]["arguments"].stringValue)")
 
             let args = toolCall["function"]["arguments"].stringValue
             
@@ -90,14 +95,17 @@ public class Swarm {
             do {
                 rawResult = try callFunction(agent: agent, functionName: name ?? "", arguments: args)
             } catch {
-                self.debugPrint(debug: debug ?? false, "Error calling function \(name ?? ""): \(error)")
+                self.debugPrint(debug: debug, "Error calling function \(name ?? ""): \(error)")
                 let errorMessage = Message()
-                errorMessage.withRole(role: "assistant").withContent(content: "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)")
+                errorMessage.withRole(role: "tool")
+                    .withContent(content: "Error: Failed to execute function \(name ?? ""). \(error.localizedDescription)")
+                    .withToolCallId(toolCallId)
+                    .withToolName(name ?? "unknown")
                 partialResponse.messages?.append(errorMessage)
                 continue
             }
             
-            let result = handleFunctionResult(rawResult, debug: debug)
+            let result = handleFunctionResult(rawResult, debug: debug, toolCallId: toolCallId, toolName: name ?? "unknown")
             if let resultMessages = result.messages {
                 for resultMessage in resultMessages {
                     partialResponse.messages?.append(resultMessage)
@@ -137,16 +145,16 @@ public class Swarm {
             )
 
             guard let messageJSON = llmresponse.getChoiceMessage(at: 0) else {
-                self.debugPrint(debug: debug ?? false, "No message received in completion.")
+                self.debugPrint(debug: debug, "No message received in completion.")
                 break
             }
 
-            self.debugPrint(debug: debug ?? false, "Received completion:", messageJSON)
+            self.debugPrint(debug: debug, "Received completion:", messageJSON)
             let message = Message(messageJSON)
             history.append(message)
 
             if messageJSON["tool_calls"].isEmpty || !executeTools {
-                self.debugPrint(debug: debug ?? false, "Ending turn.")
+                self.debugPrint(debug: debug, "Ending turn.")
                 break
             }
 
@@ -176,25 +184,38 @@ public class Swarm {
         )
     }
     
-    public func handleFunctionResult(_ result: Any, debug: Bool) -> SwarmResult {
+    public func handleFunctionResult(_ result: Any, debug: Bool, toolCallId: String, toolName: String) -> SwarmResult {
         switch result {
         case let result as SwarmResult:
             return result
         case let agent as Agent:
             let message = Message()
-            message.withRole(role: "assistant").withContent(content: agent.name)
+            message.withRole(role: "tool")
+                .withContent(content: "Switching to agent: \(agent.name)")
+                .withToolCallId(toolCallId)
+                .withToolName(toolName)
             return SwarmResult(
                 messages: [message],
                 agent: agent
             )
+        case let str as String:
+            let message = Message()
+            message.withRole(role: "tool")
+                .withContent(content: str)
+                .withToolCallId(toolCallId)
+                .withToolName(toolName)
+            return SwarmResult(messages: [message])
         default:
             do {
                 let message = Message()
-                message.withRole(role: "assistant").withContent(content: String(describing: result))
+                message.withRole(role: "tool")
+                    .withContent(content: String(describing: result))
+                    .withToolCallId(toolCallId)
+                    .withToolName(toolName)
                 return SwarmResult(messages: [message])
             } catch {
-                let errorMessage = "Failed to cast response to string: \(result). Make sure agent functions return a string or Result object. Error: \(error)"
-                self.debugPrint(debug: debug ?? false, errorMessage)
+                let errorMessage = "Failed to handle function result: \(result). Make sure agent functions return a String or Agent. Error: \(error)"
+                self.debugPrint(debug: debug, errorMessage)
                 fatalError(errorMessage)
             }
         }

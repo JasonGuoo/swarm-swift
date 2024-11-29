@@ -57,15 +57,14 @@ class WeatherAgent: Agent {
         try super.init(from: decoder)
     }
     
-    @objc func get_weather(_ args: [String: Any]) -> Data {
+    @objc func get_weather(_ args: [String: Any]) -> Any {
         let location = args["location"] as? String ?? "Unknown"
         let time = args["time"] as? String ?? "now"
         let weatherData = ["location": location, "temperature": "65", "time": time]
-        let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: JSON(weatherData).rawString() ?? "")])
-        return try! JSONEncoder().encode(result)
+        return JSON(weatherData).rawString() ?? ""
     }
     
-    @objc func send_email(_ args: [String: Any]) -> Data {
+    @objc func send_email(_ args: [String: Any]) -> Any {
         let recipient = args["recipient"] as? String ?? ""
         let subject = args["subject"] as? String ?? ""
         let body = args["body"] as? String ?? ""
@@ -75,14 +74,11 @@ class WeatherAgent: Agent {
         print("Subject: \(subject)")
         print("Body: \(body)")
         
-        let result = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: "Sent!")])
-        return try! JSONEncoder().encode(result)
+        return "Email sent successfully!"
     }
     
-    @objc func get_info(_ args: [String: Any]) -> Data {
-        var result = JSON(args)
-        let returnData = SwarmResult(messages: [Message().withRole(role: "function").withContent(content: result.rawString() ?? "")])
-        return try! JSONEncoder().encode(returnData)
+    @objc func get_info(_ args: [String: Any]) -> Any {
+        return JSON(args).rawString() ?? ""
     }
 }
 
@@ -132,13 +128,11 @@ class WeatherAgentTest: XCTestCase {
             let getWeatherArgs = ["location": "Paris", "time": "now"]
             let getWeatherResult = try callFunction(agent: weatherAgent, functionName: "get_weather", arguments: JSON(getWeatherArgs).rawString() ?? "")
             
-            if let swarmResult = getWeatherResult as? SwarmResult,
-               let message = swarmResult.messages?.first,
-               let contentStr = message.json["content"].string,
-               let weatherData = try? JSON(parseJSON: contentStr) {
-                XCTAssertEqual(weatherData["location"].stringValue, "Paris")
-                XCTAssertEqual(weatherData["temperature"].stringValue, "65")
-                XCTAssertEqual(weatherData["time"].stringValue, "now")
+            if let weatherData = getWeatherResult as? String,
+               let jsonData = try? JSON(parseJSON: weatherData) {
+                XCTAssertEqual(jsonData["location"].stringValue, "Paris")
+                XCTAssertEqual(jsonData["temperature"].stringValue, "65")
+                XCTAssertEqual(jsonData["time"].stringValue, "now")
             } else {
                 XCTFail("Unexpected result structure for get_weather")
             }
@@ -148,10 +142,8 @@ class WeatherAgentTest: XCTestCase {
                 let sendEmailArgs = ["recipient": "test@example.com", "subject": "Test Subject", "body": "Test Body"]
                 let sendEmailResult = try callFunction(agent: weatherAgent, functionName: "send_email", arguments: JSON(sendEmailArgs).rawString() ?? "")
                 
-                if let swarmResult = sendEmailResult as? SwarmResult,
-                   let message = swarmResult.messages?.first {
-                    let content = message.json["content"]
-                    XCTAssertEqual(content.stringValue, "Sent!")
+                if let result = sendEmailResult as? String {
+                    XCTAssertEqual(result, "Email sent successfully!")
                 } else {
                     XCTFail("Unexpected result structure for send_email")
                 }
@@ -198,6 +190,18 @@ class WeatherAgentTest: XCTestCase {
         let swarm = Swarm(client: client)
         let message = Message().withRole(role: "user").withContent(content: "What is the weather in Paris")
         let result = swarm.run(agent: weatherAgent, messages: [message], contextVariables: [:])
+        
+        print("Swarm run result:")
+        print("Raw result: \(result)")
+        if let messages = result.messages {
+            print("\nMessages:")
+            messages.forEach { message in
+                print("Role: \(message.role() ?? "unknown")")
+                print("Content: \(message.content() ?? "none")")
+                print("---")
+            }
+        }
+        
         XCTAssertNotNil(result)
     }
 }
