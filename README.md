@@ -26,9 +26,9 @@ swarm-swift aims to support various Language Model APIs. Currently, we're workin
 
 - OpenAI (✅ Available)
 - Azure OpenAI (✅ Available)
-- Ollama (✅ Available， but you need to be sure the model you are using supports functiion calling, for now llama3 does not.)
-- DeepSeek (✅ Available)
-- ChatGLM (✅ Available)
+- Ollama
+- DeepSeek
+- ChatGLM
 
 More may be added in the future based on community needs and contributions.
 
